@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=18 format=3]
 
 [ext_resource type="Script" path="res://world/greybox/greybox.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://player/player.tscn" id="2_player"]
@@ -8,6 +8,10 @@
 [ext_resource type="Script" path="res://ui/hud/debug_overlay.gd" id="6_debug"]
 [ext_resource type="PackedScene" path="res://ui/touch_controls/touch_controls.tscn" id="7_touch"]
 [ext_resource type="PackedScene" path="res://ui/settings/control_settings_panel.tscn" id="8_panel"]
+[ext_resource type="PackedScene" path="res://ui/touch_controls/one_hand_controls.tscn" id="9_one"]
+[ext_resource type="PackedScene" path="res://rivals/test_cube/rival_cube.tscn" id="10_cube"]
+[ext_resource type="PackedScene" path="res://combat/duel.tscn" id="11_duel"]
+[ext_resource type="Script" path="res://ui/transitions/pixelate_transition.gd" id="12_pix"]
 
 [sub_resource type="ProceduralSkyMaterial" id="sky_mat"]
 sky_top_color = Color(0.12, 0.08, 0.18, 1)
@@ -209,6 +213,11 @@ power_reading = "???"
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 4)
 power_reading = "Similar"
 
+[node name="Rivals" type="Node3D" parent="."]
+
+[node name="RivalCube" parent="Rivals" instance=ExtResource("10_cube")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, -6)
+
 [node name="Player" parent="." instance=ExtResource("2_player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 8)
 
@@ -244,6 +253,9 @@ mouse_filter = 2
 script = ExtResource("5_safe")
 
 [node name="TouchControls" parent="HUD/SafeArea" instance=ExtResource("7_touch")]
+layout_mode = 2
+
+[node name="OneHandControls" parent="HUD/SafeArea" instance=ExtResource("9_one")]
 layout_mode = 2
 
 [node name="TopBar" type="HBoxContainer" parent="HUD/SafeArea"]
@@ -286,4 +298,26 @@ theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 8
 horizontal_alignment = 1
 
+[node name="StoneLabel" type="Label" parent="HUD"]
+unique_name_in_owner = true
+visible = false
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 240.0
+offset_bottom = 290.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.75, 0.55, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 8
+theme_override_font_sizes/font_size = 30
+text = "La piedra vibra... hay un rival cerca"
+horizontal_alignment = 1
+
 [node name="SettingsPanel" parent="HUD" instance=ExtResource("8_panel")]
+
+[node name="Transition" type="CanvasLayer" parent="."]
+layer = 5
+script = ExtResource("12_pix")
+
+[node name="Duel" parent="." instance=ExtResource("11_duel")]

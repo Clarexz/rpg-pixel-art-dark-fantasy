@@ -14,12 +14,17 @@ var _touch: TouchControls
 
 
 func _ready() -> void:
+	RivalMemory.save_enabled = false
 	_world = GREYBOX.instantiate()
 	add_child(_world)
 	_player = _world.get_node("Player")
 	_touch = _world.get_node("HUD/SafeArea/TouchControls")
 	await _frames(10)
 	_player.settings.haptics_enabled = false
+	# Esta prueba es del esquema de dos pulgares (v0.1.0).
+	_player.settings.move_mode = ControlSettings.MODE_TWIN
+	_world.apply_mode()
+	await _frames(2)
 	await _run()
 	if _failures.is_empty():
 		print("CONTROLS TEST OK")

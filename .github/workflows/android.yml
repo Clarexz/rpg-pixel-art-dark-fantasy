@@ -91,6 +91,9 @@ jobs:
       - name: Prueba de controles (dedos simulados)
         run: $GODOT --headless --path . res://tools/tests/controls_test.tscn
 
+      - name: Prueba del duelo a una mano (dedos simulados)
+        run: $GODOT --headless --path . res://tools/tests/duel_test.tscn
+
       - name: Versión
         id: version
         run: tools/ci/version.sh | tee -a "$GITHUB_OUTPUT"
