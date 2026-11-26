@@ -2,7 +2,7 @@
 
 RPG de mundo abierto en primera persona para celular **en vertical**, con estética pixel art y rivales con memoria. Hecho con **Godot 4.7.2** (GDScript con tipado estático). Plataforma inicial: Android.
 
-Estado: **Fase 0**. Proyecto base + escena de prueba (cubo girando + FPS) + pipeline de releases.
+Estado: **Fase 1**. Nivel gris para probar los controles en primera persona en vertical (joystick, arrastrar para mirar, botones de acción, vibración y ajustes). Ver [`docs/fase-1-controles.md`](docs/fase-1-controles.md).
 
 ## Descargar y probar en tu Android
 
@@ -14,7 +14,7 @@ Estado: **Fase 0**. Proyecto base + escena de prueba (cubo girando + FPS) + pipe
 
 1. Descarga Godot **4.7.2 estándar** (no la versión .NET) desde godotengine.org.
 2. Abre Godot > Import > selecciona `project.godot`.
-3. F5 corre el juego en una ventana vertical de 405x720. Con el mouse se simula el touch.
+3. F5 corre el juego en una ventana vertical de 405x720. Con el mouse se simula el touch (un dedo). En la compu también hay teclado: WASD mover, Shift correr, Espacio saltar, F atacar, E piedra, M captura el mouse para mirar, Esc lo suelta.
 
 La carpeta `.godot/` es caché que el editor regenera (como `node_modules` o `.next`). No se sube al repo.
 
@@ -26,11 +26,12 @@ La carpeta `.godot/` es caché que el editor regenera (como `node_modules` o `.n
 | `rivals/` | Rivales con memoria: `RivalData`, `RivalMemory`, IA |
 | `piedra/` | La piedra mágica: poder, lectura (scouter), memoria del mundo |
 | `combat/` | Componentes de combate reutilizables: vida, hitbox/hurtbox |
-| `world/` | Niveles y zonas. `world/demo/` tiene la escena de prueba de la fase 0 |
+| `world/` | Niveles y zonas. `world/greybox/` es el nivel gris de la fase 1; `world/demo/` el cubo de la fase 0 |
 | `ui/` | HUD y menús. `ui/safe_area/` respeta notch y barra de gestos |
 | `core/` | Autoloads (`Piedra`, `SaveService`) cuando lleguen |
 | `assets/` | Arte y audio compartido entre features |
 | `tools/ci/` | Scripts que usa GitHub Actions |
+| `tools/tests/` | Pruebas automáticas (p. ej. dedos simulados sobre los controles) |
 | `docs/` | Guías y notas de diseño |
 
 Cada feature junta su escena (`.tscn`), su script (`.gd`) y sus recursos, igual que un componente de React junta JSX, estilos y tests.

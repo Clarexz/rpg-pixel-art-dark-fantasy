@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ControlSettings" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://player/controls/control_settings.gd" id="1_cs"]
+
+[resource]
+script = ExtResource("1_cs")
+look_sensitivity = 0.25
+vertical_ratio = 0.8
+invert_y = false
+fov = 80.0
+joystick_radius = 120.0
+joystick_deadzone = 0.12
+joystick_floating = true
+sprint_threshold = 0.95
+haptics_enabled = true
+haptic_ms = 20
