@@ -15,7 +15,18 @@ Reglas de los números oficiales (`0.X.Y`):
 - **0.X.0** cuando hay un avance notable (un hito: "combate pulido", "primera zona con lore").
 - **0.X.Y** para arreglos y ajustes chicos sobre esa versión.
 
-En un build de prueba, `0.X.Y` es la versión oficial **a la que va** esa mejora, `<area>` es la rama y `N` sigue la cuenta de todos los builds de prueba de esa versión (de cualquier área), así que cada build se instala encima del anterior.
+En un build de prueba, `0.X.Y` es la versión oficial **a la que va** esa mejora, `<area>` es la rama y `N` cuenta los builds de prueba de esa área para esa versión.
+
+**Ejemplo de una iteración.** v0.1.0 es la base reiniciada, así que la primera iteración de los hilos apunta a **0.2.0**:
+
+```
+v0.2.0-enemigos.1, v0.2.0-enemigos.2, v0.2.0-enemigos.3     (pruebas del hilo de enemigos)
+v0.2.0-mecanicas.1 ... v0.2.0-mecanicas.5                   (pruebas del hilo de mecánicas)
+... Caleb dice "esto basta para esta iteración" ...
+todo se junta en main  ->  sale el release oficial v0.2.0
+```
+
+La siguiente iteración usa `v0.3.0-<area>.N`, y así. Un arreglo chico sobre una oficial ya publicada sale como `0.2.1`.
 
 Los releases del prototipo (v0.0.1 a v0.6.3, antes de este esquema) quedaron archivados como `proto-v0.x.y (Prototipo)`. La serie nueva arrancó en **v0.1.0**.
 
@@ -32,7 +43,7 @@ Los releases del prototipo (v0.0.1 a v0.6.3, antes de este esquema) quedaron arc
 El **smoke test** corre el juego sin ventana 300 frames y falla si Godot imprime errores de script o de carga. Es el equivalente a "¿al menos compila y arranca?".
 
 ### Cómo trabaja un hilo de área
-1. En su rama, sube `config/version` en `project.godot` a la siguiente versión oficial si todavía no está (por ejemplo `0.2.0` si la última oficial es `0.1.x`).
+1. En su rama, pone `config/version` en `project.godot` en la versión oficial de la iteración actual (por ejemplo `0.2.0` mientras la última oficial sea `0.1.x`).
 2. Cuando tiene algo para probar, corre el workflow a mano en su rama (Claude lo hace con la API de GitHub Actions). Sale `v0.2.0-<area>.N`.
 3. Cuando el área queda lista, abre PR a `main`. Si va a salir release oficial, el PR que sube la versión agrega `docs/notas/vX.Y.Z.md` con las notas agrupadas por área (### Mecánicas, ### Enemigos, ### UI/UX...). Si no existe ese archivo, GitHub genera las notas con la lista de PRs.
 
@@ -41,12 +52,13 @@ El **smoke test** corre el juego sin ventana 300 frames y falla si Godot imprime
 La única fuente de verdad es `application/config/version` en `project.godot` (formato `X.Y.Z`). El script `tools/ci/version.sh` la copia al preset de Android y calcula el `versionCode` (el número interno que Android compara para saber si algo es "más nuevo"):
 
 ```
-versionCode = (X*10000 + Y*100 + Z) * 100 + N
-  build de prueba  0.2.0-enemigos.3  ->  20003
-  release oficial  0.2.0  (N = 99)   ->  20099
+versionCode = (X*10000 + Y*100 + Z) * 1000 + S
+  S = cuenta de TODOS los builds de prueba de esa versión (cualquier área), de 1 a 998
+  build de prueba  0.2.0-mecanicas.1 (el 4.º build de prueba de 0.2.0)  ->  200004
+  release oficial  0.2.0  (S = 999)                                      ->  200999
 ```
 
-Así un build de prueba de 0.2.0 se instala encima de 0.1.x, y el oficial 0.2.0 se instala encima de todos sus builds de prueba. Android solo instala una actualización encima de otra si el `versionCode` sube (o es igual) **y** está firmada con la misma llave. Al pasar de un build de prueba de un área a uno de otra área de la misma versión no hace falta desinstalar.
+Así cada build de prueba se instala encima del anterior aunque sea de otra área, y el oficial 0.2.0 se instala encima de todos sus builds de prueba. Android solo instala una actualización encima de otra si el `versionCode` sube **y** está firmada con la misma llave.
 
 ## La llave de firma (esto lo haces tú, una sola vez)
 

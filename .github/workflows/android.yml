@@ -125,20 +125,22 @@ jobs:
               echo "::error::v$BASE ya salió como release oficial. Sube config/version en project.godot (por ejemplo a la siguiente 0.X.0) antes de publicar builds de prueba."
               exit 1
             fi
-            # N sigue la cuenta de TODOS los builds de prueba de esta versión (de cualquier área),
-            # para que cada uno se instale encima del anterior.
-            LAST=$(gh release list --limit 200 --json tagName --jq '.[].tagName' \
-              | sed -n "s/^v${BASE//./\\.}-[a-z-]*\.\([0-9]*\)$/\1/p" | sort -n | tail -1)
+            # N = cuenta dentro del área (enemigos.1, .2...). S = cuenta de todas las áreas de
+            # esta versión, para el versionCode (cada build se instala encima del anterior).
+            TAGS=$(gh release list --limit 300 --json tagName --jq '.[].tagName' | grep -E "^v${BASE//./\\.}-[a-z-]+\.[0-9]+$" || true)
+            N=$(( $(printf "%s\n" "$TAGS" | grep -c "^v${BASE}-${REF_NAME}\." || true) + 1 ))
+            S=$(( $(printf "%s\n" "$TAGS" | grep -c . || true) + 1 ))
             echo "mode=prueba" >> "$GITHUB_OUTPUT"
             echo "area=$REF_NAME" >> "$GITHUB_OUTPUT"
-            echo "n=$(( ${LAST:-0} + 1 ))" >> "$GITHUB_OUTPUT"
+            echo "n=$N" >> "$GITHUB_OUTPUT"
+            echo "s=$S" >> "$GITHUB_OUTPUT"
           else
             echo "mode=artifact" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Versión
         id: version
-        run: tools/ci/version.sh ${{ steps.mode.outputs.area }} ${{ steps.mode.outputs.n }} | tee -a "$GITHUB_OUTPUT"
+        run: tools/ci/version.sh ${{ steps.mode.outputs.area }} ${{ steps.mode.outputs.n }} ${{ steps.mode.outputs.s }} | tee -a "$GITHUB_OUTPUT"
 
       # Una sola vez: pasa los releases del prototipo (v0.0.1 a v0.6.3) a proto-vX.Y.Z.
       # Es idempotente; se puede quitar cuando ya corrió.
