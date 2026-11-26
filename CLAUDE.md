@@ -19,7 +19,11 @@ Reglas:
 ## Reglas de trabajo de Caleb
 
 - **Plan primero:** antes de cada trabajo, darle a Caleb el plan y esperar su OK.
-- **Versiones pequeñas y controladas:** una versión por punto del orden de trabajo (sube `application/config/version` en `project.godot` en el PR; el push a main publica el Release).
+- **Versiones (desde 2026-11-26, serie nueva desde v0.1.0):**
+  - **Build de prueba** por área: pre-release `vX.Y.0-<area>.N` (N cuenta dentro del área: `enemigos.1`, `.2`, `.3`...). En la rama del área, `config/version` de `project.godot` = la versión oficial de la iteración en curso; se publica corriendo el workflow `Android build` a mano en esa rama (`workflow_dispatch`). No quema números de versión.
+  - **Iteración:** v0.1.0 es la base reiniciada; la primera iteración de los hilos publica `0.2.0-<area>.N`. Cuando Caleb diga que la iteración basta, todo se junta en main y sale la `0.2.0`. La siguiente usa `0.3.0-<area>.N`.
+  - **Release oficial** desde `main`: `0.X.0` por hito, `0.X.Y` por arreglos. El PR que sube la versión agrega `docs/notas/vX.Y.Z.md` con notas agrupadas por área. El push a main publica el Release.
+  - Los releases del prototipo (v0.0.1 a v0.6.3) están archivados como `proto-v0.x.y`. Detalle en `docs/flujo-de-releases.md`.
 - **Observaciones:** todo lo que Caleb reporte al probar se anota en `/mnt/project-files/Observaciones.md`, y no se trabaja hasta que él lo diga.
 - **Roadmap:** actualizar `/mnt/project-files/roadmap-y-prompts.md` (y `contexto-juego-rivales.md` si aplica) cada vez que cambien mecánicas u organización.
 - **Memoria por hilo:** cada hilo persistente lleva su memoria y plan en `/mnt/project-files/memoria-hilos/<area>.md`; un hilo nuevo de un área la lee primero.

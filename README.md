@@ -48,7 +48,9 @@ Cada feature junta su escena (`.tscn`), su script (`.gd`) y sus recursos, igual 
 Lo explica a detalle [`docs/flujo-de-releases.md`](docs/flujo-de-releases.md). En corto:
 
 1. Cada avance llega como **pull request**. GitHub Actions corre un smoke test y construye un APK de prueba (queda como artifact del run).
-2. Si el PR sube la versión en `project.godot` (`application/config/version`), al hacer merge a `main` se publica el **GitHub Release `vX.Y.Z`** con el APK firmado.
+2. Si el PR sube la versión en `project.godot` (`application/config/version`), al hacer merge a `main` se publica el **release oficial `vX.Y.Z`** con el APK firmado.
+3. Cada área (mecanicas, mundo, lore, enemigos, sprites, ui-ux) puede publicar desde su rama **builds de prueba** como pre-release `vX.Y.Z-<area>.N`.
+4. Los releases del prototipo quedaron archivados como `proto-v0.x.y`; la serie nueva empezó en v0.1.0.
 
 ## Guía de Godot para devs web
 
