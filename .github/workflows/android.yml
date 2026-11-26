@@ -69,7 +69,8 @@ jobs:
           set -euo pipefail
           chmod +x ~/godot-bin/godot
           echo "GODOT=$HOME/godot-bin/godot" >> "$GITHUB_ENV"
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;${ANDROID_BUILD_TOOLS}" "platform-tools" > /dev/null
+          (yes || true) | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;${ANDROID_BUILD_TOOLS}" "platform-tools" > /dev/null || true
+          test -x "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/apksigner"
           MINOR=$(echo "$GODOT_VERSION" | cut -d. -f1,2)
           mkdir -p ~/.config/godot
           cat > ~/.config/godot/editor_settings-${MINOR}.tres <<EOF
