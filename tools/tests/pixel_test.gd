@@ -1,5 +1,5 @@
 extends Node
-## Prueba automática del pipeline pixel art (v0.3.0):
+## Prueba automática del pipeline pixel art (v0.4.0):
 ## 1) el mundo 3D se dibuja en el SubViewport chiquito con factor entero,
 ## 2) la cámara espejo sigue a la del jugador (también al moverse),
 ## 3) "Nativa" regresa al render normal, 4) el override de renderer,
@@ -13,7 +13,9 @@ var _failures: PackedStringArray = []
 
 
 func _ready() -> void:
-	RivalMemory.save_enabled = false
+	RivalRegistry.save_enabled = false
+	Piedra.save_enabled = false
+	Piedra.use_record(PlayerRecord.new())
 	await _run()
 	if _failures.is_empty():
 		print("PIXEL TEST OK")

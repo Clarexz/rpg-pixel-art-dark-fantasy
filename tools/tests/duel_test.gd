@@ -17,7 +17,9 @@ var _ui: DuelUI
 
 
 func _ready() -> void:
-	RivalMemory.save_enabled = false
+	RivalRegistry.save_enabled = false
+	Piedra.save_enabled = false
+	Piedra.use_record(PlayerRecord.new())
 	_world = GREYBOX.instantiate()
 	add_child(_world)
 	_player = _world.get_node("Player")
@@ -149,19 +151,26 @@ func _run() -> void:
 	await _until(func() -> bool: return not _duel.is_active(), 6.0)
 	_check(_duel.result == &"fled", "no se pudo huir (%s)" % _duel.result)
 	_check(_one.visible, "los controles no regresaron al salir del duelo")
-	var memory: RivalMemory = _world.get("_memory")
+	var registry: RivalRegistry = _world.get("_rivals")
+	var memory: RivalMemory = registry.memory_for(_rival.data.id)
 	_check(memory.duels == 1 and memory.last_result == "fled", "el cubo no recordó el duelo")
-	_check(memory.greeting().begins_with("La última vez huiste"), "el saludo no menciona que huiste: %s" % memory.greeting())
+	_check(memory.attack_counts[0] == 1 and memory.attack_counts[2] == 1, "el cubo no recordó tus golpes (%s)" % str(memory.attack_counts))
+	_check(memory.spell_counts.get("Fuego", 0) == 1, "el cubo no recordó tu Fuego")
+	_check(Piedra.record.duels == 1 and Piedra.record.flees == 1, "la piedra no registró el duelo")
+	var hello: String = RivalDialogue.greeting(_rival.data, memory, RivalTactics.plan(_rival.data, memory))
+	_check(hello.begins_with("La última vez huiste"), "el saludo no menciona que huiste: %s" % hello)
 
 	# 8) Memoria: tras 3 duelos cubre tu lado favorito.
 	print("Paso 8: Memoria: tras 3 duelos cubre tu lado favorito.")
 	memory.duels = 3
 	memory.attack_counts = [9, 1, 1]
+	_duel._tactics = RivalTactics.plan(_rival.data, memory)
 	var guards: Array[int] = [0, 0, 0]
 	for i: int in 200:
 		guards[_duel._pick_guard()] += 1
 	_check(guards[0] > 120, "el cubo no cubre tu lado favorito tras 3 duelos (%s)" % str(guards))
-	_check(memory.greeting().contains("la izquierda"), "el saludo no menciona tu lado favorito")
+	hello = RivalDialogue.greeting(_rival.data, memory, _duel._tactics)
+	_check(hello.contains("la izquierda"), "el saludo no menciona tu lado favorito: %s" % hello)
 
 
 ## Durante el turno del rival: bloquear cada golpe en el momento perfecto

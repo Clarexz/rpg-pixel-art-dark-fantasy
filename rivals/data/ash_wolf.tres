@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="RivalData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://rivals/rival_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"ash_wolf"
+display_name = "Lobo de ceniza"
+max_hp = 120
+power = 160
+weakness = "Fuego"
+cunning = 1.5
+pride = 0.9
+line_first_meet = "Hueles a miedo. Me gusta."
+line_defeated = "Esta cicatriz será tu nombre."

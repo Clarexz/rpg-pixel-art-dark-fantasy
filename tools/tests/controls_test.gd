@@ -14,7 +14,8 @@ var _touch: TouchControls
 
 
 func _ready() -> void:
-	RivalMemory.save_enabled = false
+	RivalRegistry.save_enabled = false
+	Piedra.save_enabled = false
 	_world = GREYBOX.instantiate()
 	add_child(_world)
 	_player = _world.get_node("Player")
