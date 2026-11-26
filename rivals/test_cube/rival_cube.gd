@@ -8,8 +8,11 @@ extends StaticBody3D
 
 signal engaged(rival: RivalCube, advantage: StringName)  # &"player" o &"rival"
 
-@export var display_name: String = "Cubo de prueba"
-@export var max_hp: int = 90
+## Quién es este rival (nombre, poder, temperamento). Su memoria de ti vive
+## aparte, en RivalRegistry, bajo data.id.
+@export var data: RivalData = preload("res://rivals/data/test_cube.tres")
+var display_name: String = "Cubo de prueba"
+var max_hp: int = 90
 ## A esta distancia (m) la piedra empieza a vibrar.
 @export var sense_radius: float = 10.0
 ## A esta distancia te nota y empieza a llenarse su "!".
@@ -41,6 +44,8 @@ func _ready() -> void:
 	add_to_group("rival")
 	add_to_group("assist_target")
 	_home = global_transform
+	display_name = data.display_name
+	max_hp = data.max_hp
 	hp = max_hp
 	_mat = (_mesh.mesh.surface_get_material(0) as StandardMaterial3D).duplicate()
 	_mesh.material_override = _mat
