@@ -43,6 +43,13 @@ window/handheld/orientation=1
 
 pointing/emulate_touch_from_mouse=true
 
+[navigation]
+
+; Los mapas de navegación de zonas grandes (la Hondonada) nunca terminaban de
+; armarse en segundo plano en las pruebas sin pantalla. Armado directo: cuesta
+; un instante al cargar la zona y siempre funciona.
+world/region_use_async_iterations=false
+
 [rendering]
 
 renderer/rendering_method="mobile"
