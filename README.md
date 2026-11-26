@@ -2,7 +2,7 @@
 
 RPG de mundo abierto en primera persona para celular **en vertical**, con estética pixel art y rivales con memoria. Hecho con **Godot 4.7.2** (GDScript con tipado estático). Plataforma inicial: Android.
 
-Estado: **Fase 1**. Nivel gris para probar los controles en primera persona en vertical (joystick, arrastrar para mirar, botones de acción, vibración y ajustes). Ver [`docs/fase-1-controles.md`](docs/fase-1-controles.md).
+Estado: **v0.2.0, prototipo a una mano**. Exploración en primera persona con un solo pulgar (libre o por casillas) y un duelo por turnos contra un cubo de prueba que te recuerda. Ver [`docs/prototipo-una-mano.md`](docs/prototipo-una-mano.md). La fase 1 (dos pulgares) sigue disponible en Ajustes: [`docs/fase-1-controles.md`](docs/fase-1-controles.md).
 
 ## Descargar y probar en tu Android
 
@@ -23,12 +23,12 @@ La carpeta `.godot/` es caché que el editor regenera (como `node_modules` o `.n
 | Carpeta | Qué va ahí |
 |---|---|
 | `player/` | Jugador: movimiento, cámara en primera persona, controles táctiles |
-| `rivals/` | Rivales con memoria: `RivalData`, `RivalMemory`, IA |
+| `rivals/` | Rivales con memoria. Hoy: `RivalMemory` y el cubo de prueba (`rivals/test_cube/`) |
 | `piedra/` | La piedra mágica: poder, lectura (scouter), memoria del mundo |
-| `combat/` | Componentes de combate reutilizables: vida, hitbox/hurtbox |
+| `combat/` | El duelo por turnos: reglas (`duel.gd`) y su pantalla (`duel_ui.gd`) |
 | `world/` | Niveles y zonas. `world/greybox/` es el nivel gris de la fase 1; `world/demo/` el cubo de la fase 0 |
 | `ui/` | HUD y menús. `ui/safe_area/` respeta notch y barra de gestos |
-| `core/` | Autoloads (`Piedra`, `SaveService`) cuando lleguen |
+| `core/` | Autoloads (globales). Hoy: `Sfx`, sonidos placeholder generados por código |
 | `assets/` | Arte y audio compartido entre features |
 | `tools/ci/` | Scripts que usa GitHub Actions |
 | `tools/tests/` | Pruebas automáticas (p. ej. dedos simulados sobre los controles) |

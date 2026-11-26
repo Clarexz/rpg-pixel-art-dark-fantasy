@@ -9,6 +9,11 @@ extends Resource
 const USER_PATH: String = "user://control_settings.tres"
 const DEFAULT_PATH: String = "res://player/controls/default_control_settings.tres"
 
+## Modos de movimiento (valores de move_mode).
+const MODE_TANK: int = 0  ## Un pulgar: arriba/abajo avanza, a los lados gira.
+const MODE_GRID: int = 1  ## Un pulgar: pasos de una casilla y giros de 90°.
+const MODE_TWIN: int = 2  ## Dos pulgares, como v0.1.0.
+
 @export_group("Mirar")
 ## Grados que gira la cámara por cada píxel (de UI) que arrastras el dedo.
 @export_range(0.05, 1.0, 0.01) var look_sensitivity: float = 0.25
@@ -28,6 +33,18 @@ const DEFAULT_PATH: String = "res://player/controls/default_control_settings.tre
 ## Empujar el joystick más allá de esta fracción activa correr.
 @export_range(0.7, 1.01, 0.01) var sprint_threshold: float = 0.95
 
+@export_group("Una mano")
+## Cómo te mueves al explorar. Se cambia en Ajustes para comparar.
+@export_enum("Una mano: libre", "Una mano: casillas", "Dos pulgares (v0.1)") var move_mode: int = MODE_TANK
+## Pone los botones del lado izquierdo (exploración y combate).
+@export var left_handed: bool = false
+## Grados por segundo que giras con el stick de una mano empujado al lado.
+@export_range(60.0, 300.0, 5.0) var tank_turn_speed: float = 140.0
+
+@export_group("Combate")
+## Mostrar qué botones tocar en las canciones de los hechizos (modo aprendizaje).
+@export var show_song_hints: bool = true
+
 @export_group("Vibración")
 @export var haptics_enabled: bool = true
 ## Duración base de una vibración corta, en milisegundos.
@@ -42,6 +59,10 @@ static func load_or_default() -> ControlSettings:
 			return saved
 	var base: ControlSettings = load(DEFAULT_PATH)
 	return base.duplicate()
+
+
+func is_one_hand() -> bool:
+	return move_mode != MODE_TWIN
 
 
 func save() -> void:

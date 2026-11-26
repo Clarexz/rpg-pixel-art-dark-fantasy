@@ -9,7 +9,12 @@ extends PanelContainer
 signal closed
 
 ## [propiedad del Resource, texto, mínimo, máximo, paso]. Sin mínimo = checkbox.
+## [propiedad, texto, [opciones]] = lista desplegable.
 const ROWS: Array = [
+	["move_mode", "Modo de movimiento", ["Una mano: libre", "Una mano: por casillas", "Dos pulgares (v0.1)"]],
+	["left_handed", "Modo zurdo (botones a la izquierda)"],
+	["tank_turn_speed", "Velocidad de giro (una mano)", 60.0, 300.0, 5.0],
+	["show_song_hints", "Mostrar las notas de los hechizos"],
 	["look_sensitivity", "Sensibilidad al mirar", 0.05, 1.0, 0.01],
 	["vertical_ratio", "Sensibilidad vertical (x)", 0.2, 2.0, 0.05],
 	["invert_y", "Invertir eje vertical"],
@@ -66,6 +71,18 @@ func _build_rows() -> void:
 			check.button_pressed = settings.get(prop)
 			check.toggled.connect(func(on: bool) -> void: settings.set(prop, on))
 			_rows.add_child(check)
+			continue
+		if row.size() == 3:
+			var options_title: Label = Label.new()
+			options_title.text = row[1]
+			_rows.add_child(options_title)
+			var options: OptionButton = OptionButton.new()
+			options.custom_minimum_size.y = 64
+			for option: String in row[2]:
+				options.add_item(option)
+			options.selected = settings.get(prop)
+			options.item_selected.connect(func(index: int) -> void: settings.set(prop, index))
+			_rows.add_child(options)
 			continue
 		var title: Label = Label.new()
 		_rows.add_child(title)
