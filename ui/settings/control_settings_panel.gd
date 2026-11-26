@@ -101,3 +101,65 @@ func _build_rows() -> void:
 			# int para las propiedades enteras (haptic_ms), float para el resto.
 			settings.set(prop, int(value) if typeof(settings.get(prop)) == TYPE_INT else value)
 			update_title.call(value))
+	_build_graphics_rows()
+
+
+## Sección "Gráficos y rendimiento". Estos ajustes viven en el autoload
+## Graphics (no en ControlSettings) y se guardan al momento.
+func _build_graphics_rows() -> void:
+	var header: Label = Label.new()
+	header.text = "— Gráficos y rendimiento —"
+	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_rows.add_child(header)
+
+	var gs: GraphicsSettings = Graphics.settings
+	var res_title: Label = Label.new()
+	res_title.text = "Resolución del mundo 3D"
+	_rows.add_child(res_title)
+	var res: OptionButton = OptionButton.new()
+	res.custom_minimum_size.y = 64
+	for name: String in GraphicsSettings.PIXEL_NAMES:
+		res.add_item(name)
+	res.selected = maxi(0, GraphicsSettings.PIXEL_HEIGHTS.find(gs.pixel_height))
+	res.item_selected.connect(func(index: int) -> void:
+		Graphics.set_pixel_height(GraphicsSettings.PIXEL_HEIGHTS[index])
+		gs.save())
+	_rows.add_child(res)
+
+	var perf: CheckButton = CheckButton.new()
+	perf.text = "Monitor de rendimiento completo"
+	perf.button_pressed = gs.show_perf
+	perf.toggled.connect(func(on: bool) -> void:
+		gs.show_perf = on
+		gs.save())
+	_rows.add_child(perf)
+
+	var methods: Array[String] = ["mobile", "gl_compatibility"]
+	var rend_title: Label = Label.new()
+	rend_title.text = "Renderer (ahora: %s)" % Graphics.renderer_name(Graphics.current_renderer())
+	_rows.add_child(rend_title)
+	var rend: OptionButton = OptionButton.new()
+	rend.custom_minimum_size.y = 64
+	for m: String in methods:
+		rend.add_item(Graphics.renderer_name(m))
+	rend.selected = maxi(0, methods.find(Graphics.next_renderer()))
+	_rows.add_child(rend)
+	var rend_note: Label = Label.new()
+	rend_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	rend_note.add_theme_font_size_override("font_size", 24)
+	_rows.add_child(rend_note)
+	var update_note: Callable = func() -> void:
+		var pending: bool = Graphics.next_renderer() != Graphics.current_renderer()
+		rend_note.text = "Cierra la app y vuelve a abrirla para usar el renderer nuevo." if pending else ""
+	update_note.call()
+	rend.item_selected.connect(func(index: int) -> void:
+		Graphics.request_renderer(methods[index])
+		update_note.call())
+
+	var bench: Button = Button.new()
+	bench.text = "Prueba de rendimiento (≈1 min)"
+	bench.custom_minimum_size.y = 80
+	bench.pressed.connect(func() -> void:
+		close()
+		get_tree().change_scene_to_file(Graphics.BENCHMARK_SCENE))
+	_rows.add_child(bench)

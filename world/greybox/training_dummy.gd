@@ -10,37 +10,33 @@ extends StaticBody3D
 @export var power_reading: String = "Similar"
 
 var _hits: int = 0
-var _base_y: float = 0.0
 var _flash_tween: Tween
 
-@onready var _mesh: MeshInstance3D = $Mesh
+## Sprite3D "billboard": una imagen plana que siempre gira para mirarte
+## (solo en el eje Y, como los enemigos de Doom). Mucho más barato que un
+## modelo 3D y es el look pixel art que buscamos.
+@onready var _sprite: Sprite3D = $Sprite
 @onready var _label: Label3D = $Label
 
 
 func _ready() -> void:
 	add_to_group("scannable")
-	# Cada muñeco necesita su propio material para brillar por separado.
-	_mesh.material_override = (_mesh.mesh.surface_get_material(0) as StandardMaterial3D).duplicate()
-	_base_y = _mesh.position.y
 	_label.text = ""
 
 
-func take_hit(push_dir: Vector3) -> void:
+func take_hit(_push_dir: Vector3) -> void:
 	_hits += 1
 	_label.text = "Golpes: %d" % _hits
-	var mat: StandardMaterial3D = _mesh.material_override
 	if _flash_tween:
 		_flash_tween.kill()
 	_flash_tween = create_tween().set_parallel()
-	mat.emission_enabled = true
-	mat.emission = Color(1, 0.4, 0.3)
-	mat.emission_energy_multiplier = 2.0
-	_flash_tween.tween_property(mat, "emission_energy_multiplier", 0.0, 0.25)
-	# Sacudida: se inclina en la dirección del golpe y regresa.
-	var local_push: Vector3 = global_basis.inverse() * push_dir
-	var tilt: Vector3 = Vector3(local_push.z, 0, -local_push.x).normalized() * 0.35
-	_mesh.rotation = tilt
-	_flash_tween.tween_property(_mesh, "rotation", Vector3.ZERO, 0.35) \
+	# Destello rojo: modulate multiplica el color del sprite (como un filtro CSS).
+	_sprite.modulate = Color(1.6, 0.55, 0.45)
+	_flash_tween.tween_property(_sprite, "modulate", Color.WHITE, 0.25)
+	# Un billboard no se puede inclinar (siempre te mira), así que en vez de
+	# sacudirlo lo "aplastamos" y regresa con rebote.
+	_sprite.scale = Vector3(1.25, 0.8, 1.0)
+	_flash_tween.tween_property(_sprite, "scale", Vector3.ONE, 0.35) \
 		.set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 
 
