@@ -12,7 +12,7 @@ config_version=5
 
 config/name="RPG Pixel Art Dark Fantasy"
 config/description="RPG de mundo abierto en primera persona, vertical, pixel art."
-config/version="0.6.1"
+config/version="0.6.2"
 run/main_scene="res://world/world.tscn"
 config/features=PackedStringArray("4.7", "Mobile")
 config/icon="res://icon.svg"
@@ -42,6 +42,13 @@ window/handheld/orientation=1
 [input_devices]
 
 pointing/emulate_touch_from_mouse=true
+
+[navigation]
+
+; Los mapas de navegación de zonas grandes (la Hondonada) nunca terminaban de
+; armarse en segundo plano en las pruebas sin pantalla. Armado directo: cuesta
+; un instante al cargar la zona y siempre funciona.
+world/region_use_async_iterations=false
 
 [rendering]
 

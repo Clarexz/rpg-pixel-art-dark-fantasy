@@ -57,3 +57,9 @@ modulate = Color(1, 0.3, 0.2, 1)
 font_size = 96
 outline_size = 18
 text = ""
+
+[node name="NavigationAgent3D" type="NavigationAgent3D" parent="."]
+path_desired_distance = 0.6
+target_desired_distance = 0.5
+path_height_offset = 0.0
+radius = 0.45

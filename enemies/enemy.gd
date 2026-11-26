@@ -63,6 +63,8 @@ var _tween: Tween
 @onready var _guard: MeshInstance3D = $Guard
 @onready var _label: Label3D = $Label
 @onready var _shape: CollisionShape3D = $CollisionShape3D
+## Busca caminos alrededor de paredes si la zona tiene mapa de navegación.
+@onready var _agent: NavigationAgent3D = $NavigationAgent3D
 
 
 func _ready() -> void:
@@ -128,7 +130,7 @@ func _physics_process(delta: float) -> void:
 				engaged.emit(self, &"rival")
 				return
 			else:
-				move = to_player.normalized() * data.chase_speed
+				move = _steer_to(player.global_position) * data.chase_speed
 	if state != State.NOTICE and state != State.CHASE:
 		_notice = maxf(_notice - delta * 2.0, 0.0)
 	_update_alarm()
@@ -143,14 +145,37 @@ func _physics_process(delta: float) -> void:
 func _patrol(delta: float) -> Vector3:
 	var to: Vector3 = _target - global_position
 	to.y = 0.0
-	if to.length() < 0.3:
+	# Llegó, o el punto quedó dentro de una pared y ya está lo más cerca posible.
+	var stuck: bool = _has_navigation() and _agent.target_position.is_equal_approx(_target) \
+			and _agent.is_navigation_finished()
+	if to.length() < 0.3 or stuck:
 		_wait -= delta
 		if _wait <= 0.0:
 			var a: float = randf() * TAU
 			_target = _home.origin + Vector3(cos(a), 0.0, sin(a)) * randf_range(0.5, patrol_radius)
 			_wait = randf_range(1.0, 2.5)
 		return Vector3.ZERO
-	return to.normalized() * walk_speed
+	return _steer_to(_target) * walk_speed
+
+
+## Dirección (horizontal, de largo 1) para llegar a `point`. Si la zona tiene
+## mapa de navegación, sigue el camino que rodea paredes; si no, va derecho.
+func _steer_to(point: Vector3) -> Vector3:
+	var straight: Vector3 = point - global_position
+	straight.y = 0.0
+	if _has_navigation():
+		_agent.target_position = point
+		var next: Vector3 = _agent.get_next_path_position() - global_position
+		next.y = 0.0
+		if next.length() > 0.05:
+			return next.normalized()
+	return straight.normalized() if straight.length() > 0.001 else Vector3.ZERO
+
+
+func _has_navigation() -> bool:
+	var map: RID = _agent.get_navigation_map()
+	return map.is_valid() and NavigationServer3D.map_get_iteration_id(map) > 0 \
+			and not NavigationServer3D.map_get_regions(map).is_empty()
 
 
 func _update_alarm() -> void:
