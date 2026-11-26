@@ -113,12 +113,12 @@ func _shape_points(scale_factor: float) -> PackedVector2Array:
 
 func _draw() -> void:
 	var fill: Color = color
-	fill.a = 0.75 if pressed else 0.35
+	fill.a = 1.0 if pressed else 0.85
 	var points: PackedVector2Array = _shape_points(0.92 if pressed else 1.0)
 	draw_colored_polygon(points, fill)
 	var outline: PackedVector2Array = points.duplicate()
 	outline.append(points[0])
-	draw_polyline(outline, Color(1, 1, 1, 0.6), 3.0, true)
+	draw_polyline(outline, fill.darkened(0.55), 4.0, true)  # borde oscuro del mismo tono (estilo pixel art)
 	var box: Vector2 = get_box_size()
 	var font: Font = get_theme_default_font()
 	var font_size: int = int(radius * visual_scale * 0.45)

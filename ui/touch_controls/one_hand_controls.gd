@@ -64,6 +64,9 @@ func add_blocker(control: Control) -> void:
 ## Separación del botón de ataque respecto al borde del stick (mano derecha).
 const BASE_STICK_RADIUS: float = 95.0
 const ATTACK_GAP: float = 62.0
+## Paleta A (elegida por Caleb): stick café claro y perilla más clara.
+const STICK_COLOR: Color = Color(0.78, 0.64, 0.48)
+const KNOB_COLOR: Color = Color(0.9, 0.8, 0.66)
 const ATTACK_LIFT: float = 0.0  # centrado con el stick (pedido de Caleb)
 ## Espacio plano entre el cuadrado de ataque y la media luna de la piedra.
 const STONE_GAP: float = 14.0
@@ -290,15 +293,15 @@ func _draw() -> void:
 	var active: bool = _finger != -1
 	var center: Vector2 = (_center if active else _anchor) - global_position
 	var knob: Vector2 = (_knob if active else _anchor) - global_position
-	var alpha: float = 0.5 if active else 0.22
-	draw_circle(center, r, Color(0.77, 0.63, 0.47, alpha + 0.1))
-	draw_arc(center, r, 0.0, TAU, 64, Color(1, 1, 1, alpha + 0.15), 3.0, true)
+	var alpha: float = 0.75 if active else 0.6
+	draw_circle(center, r, STICK_COLOR * Color(1, 1, 1, alpha))
+	draw_arc(center, r, 0.0, TAU, 64, STICK_COLOR.darkened(0.55), 4.0, true)
 	if _sprinting:
 		draw_arc(center, r + 8.0 * s, 0.0, TAU, 64, Color(1, 0.8, 0.2, 0.8), 4.0 * s, true)
 	# Las flechas llevan una sombra oscura para leerse sobre el café claro.
 	_draw_hints(center + Vector2(1.5, 1.5), r, Color(0.2, 0.12, 0.05, alpha + 0.3))
 	_draw_hints(center, r, Color(1, 1, 1, alpha + 0.4))
-	draw_circle(knob, r * 0.42, Color(0.88, 0.78, 0.65, alpha + 0.3))
+	draw_circle(knob, r * 0.42, KNOB_COLOR)
 
 
 func _draw_hints(center: Vector2, r: float, hint: Color) -> void:
