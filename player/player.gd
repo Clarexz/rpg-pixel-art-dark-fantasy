@@ -50,6 +50,9 @@ var _grid_busy: bool = false
 
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var _pitch: float = 0.0
+## Inclinación de la vista durante un duelo (radianes, negativo = abajo).
+var duel_pitch: float = 0.0
+var _weapon_home: Vector3
 var _attack_timer: float = 0.0
 var _jump_queued: bool = false
 var _keyboard_was_moving: bool = false
@@ -155,7 +158,11 @@ func _physics_process(delta: float) -> void:
 		settings.pulse(0.5)
 	_jump_queued = false
 
-	if settings.is_one_hand():
+	if not controls_enabled:
+		# En duelo la vista baja un poco para ver al enemigo de cuerpo entero.
+		_pitch = lerpf(_pitch, duel_pitch, clampf(6.0 * delta, 0.0, 1.0))
+		_head.rotation.x = _pitch
+	elif settings.is_one_hand():
 		# Con un pulgar no hay cómo mirar arriba/abajo: la vista se nivela sola.
 		_pitch = lerpf(_pitch, 0.0, clampf(6.0 * delta, 0.0, 1.0))
 		_head.rotation.x = _pitch
@@ -305,6 +312,15 @@ func respawn() -> void:
 	velocity = Vector3.ZERO
 	if grid_mode:
 		snap_to_grid()
+
+
+## En duelo el arma se baja a la esquina para no tapar al enemigo (su
+## pose de "preparar golpe" es el aviso principal). Al atacar sigue moviéndose.
+func lower_weapon(lowered: bool) -> void:
+	if _weapon_home == Vector3.ZERO:
+		_weapon_home = _weapon.position
+	var target: Vector3 = _weapon_home + (Vector3(0.12, -0.12, 0.0) if lowered else Vector3.ZERO)
+	create_tween().tween_property(_weapon, "position", target, 0.25)
 
 
 ## Animación del arma. side: 0 = izquierda, 1 = centro, 2 = derecha.

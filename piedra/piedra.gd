@@ -44,7 +44,7 @@ func save() -> void:
 		push_warning("No se pudo guardar la piedra: %s" % error_string(err))
 
 
-## Lee a un rival con tu piedra.
-func scan(data: RivalData, memory: RivalMemory) -> PowerReading:
+## Lee a un enemigo o rival (memory = null si es común).
+func scan(data: EnemyData, memory: RivalMemory) -> PowerReading:
 	return PowerReading.read(record.level(), record.power(), data.display_name,
 			PowerReading.rival_power(data, memory), data.weakness)

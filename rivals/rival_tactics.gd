@@ -43,6 +43,13 @@ var extra_strikes: int = 0
 var learned: PackedStringArray = []
 
 
+## Tácticas de un enemigo COMÚN (sin memoria): nunca se adapta a ti.
+static func for_enemy(data: EnemyData) -> RivalTactics:
+	var t: RivalTactics = RivalTactics.new()
+	t.weakness = data.weakness
+	return t
+
+
 static func plan(data: RivalData, memory: RivalMemory) -> RivalTactics:
 	var t: RivalTactics = RivalTactics.new()
 	t.weakness = data.weakness
@@ -100,3 +107,11 @@ func spell_multiplier(spell_name: String) -> float:
 
 func pick_windup(rng: RandomNumberGenerator) -> float:
 	return rng.randf_range(windup.x, windup.y)
+
+
+## Aviso de un movimiento concreto. Si aprendió a "cambiar el ritmo",
+## el rango se abre (a veces más rápido, a veces más lento).
+func pick_windup_for(base: Vector2, rng: RandomNumberGenerator) -> float:
+	if windup == WINDUP_NORMAL:
+		return rng.randf_range(base.x, base.y)
+	return rng.randf_range(base.x * 0.7, base.y * 1.25)

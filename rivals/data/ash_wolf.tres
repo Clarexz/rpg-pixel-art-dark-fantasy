@@ -1,6 +1,44 @@
-[gd_resource type="Resource" script_class="RivalData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="RivalData" load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://rivals/rival_data.gd" id="1"]
+[ext_resource type="Script" path="res://combat/enemy_move.gd" id="2"]
+[ext_resource type="Texture2D" path="res://enemies/sprites/ash_wolf.png" id="3"]
+
+[sub_resource type="Resource" id="m1"]
+script = ExtResource("2")
+id = &"zarpazo"
+display_name = "Zarpazo"
+kind = 0
+hits = 1
+damage = 12
+windup = Vector2(0.6, 1.1)
+
+[sub_resource type="Resource" id="m2"]
+script = ExtResource("2")
+id = &"dentellada"
+display_name = "Dentellada doble"
+kind = 1
+hits = 2
+damage = 10
+windup = Vector2(0.5, 0.8)
+
+[sub_resource type="Resource" id="m3"]
+script = ExtResource("2")
+id = &"amago"
+display_name = "Amago"
+kind = 2
+hits = 1
+damage = 14
+windup = Vector2(0.9, 1.3)
+
+[sub_resource type="Resource" id="m4"]
+script = ExtResource("2")
+id = &"aullido"
+display_name = "Aullido de brasas"
+kind = 3
+hits = 1
+damage = 28
+windup = Vector2(1.0, 1.2)
 
 [resource]
 script = ExtResource("1")
@@ -9,7 +47,15 @@ display_name = "Lobo de ceniza"
 max_hp = 120
 power = 160
 weakness = "Fuego"
-cunning = 1.5
-pride = 0.9
+pattern = PackedStringArray("zarpazo", "amago", "dentellada", "zarpazo", "aullido")
+pattern_low = PackedStringArray("dentellada", "amago", "aullido")
+loot = {"pocion": 0.7, "bomba": 0.3}
+pixel_size = 0.044
+duel_distance = 4.4
+chase_speed = 3.0
 line_first_meet = "Hueles a miedo. Me gusta."
 line_defeated = "Esta cicatriz será tu nombre."
+cunning = 1.5
+pride = 0.9
+moves = Array[ExtResource("2")]([SubResource("m1"), SubResource("m2"), SubResource("m3"), SubResource("m4")])
+sprite = ExtResource("3")

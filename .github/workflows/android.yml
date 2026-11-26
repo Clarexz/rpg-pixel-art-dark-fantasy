@@ -92,13 +92,16 @@ jobs:
         run: $GODOT --headless --path . res://tools/tests/controls_test.tscn
 
       - name: Prueba del duelo a una mano (dedos simulados)
-        run: $GODOT --headless --path . res://tools/tests/duel_test.tscn
+        run: timeout 300 $GODOT --headless --path . res://tools/tests/duel_test.tscn
 
       - name: Pruebas de rivales y piedra (lógica + simulación de 10 duelos)
         run: timeout 300 $GODOT --headless --path . res://tools/tests/rivals_test.tscn
 
       - name: Prueba del pipeline pixel art y del benchmark
         run: timeout 300 $GODOT --headless --path . res://tools/tests/pixel_test.tscn
+
+      - name: Prueba del combate real (enemigos, patrones, items, huir)
+        run: timeout 300 $GODOT --headless --path . res://tools/tests/combat_test.tscn
 
       - name: Versión
         id: version

@@ -13,7 +13,8 @@ signal level_changed(level: int)
 ## XP de piedra necesaria para cada nivel (nivel 1 = índice 0).
 const LEVEL_XP: Array[int] = [0, 30, 80, 160]
 const XP_WIN: int = 20
-## La primera vez que vences a un rival absorbes un fragmento de su piedra.
+## La primera vez que vences a un RIVAL absorbes un fragmento de su piedra
+## (los enemigos comunes no tienen piedra propia: solo dan XP).
 const XP_FIRST_ABSORB: int = 20
 const XP_LOSE: int = 5
 const XP_FLED: int = 2
@@ -72,7 +73,7 @@ func record(e: Encounter) -> bool:
 			wins += 1
 			stone_xp += XP_WIN
 			rep_delta = REP_WIN
-			if not absorbed.has(String(e.rival_id)):
+			if e.is_rival and not absorbed.has(String(e.rival_id)):
 				absorbed.append(String(e.rival_id))
 				stone_xp += XP_FIRST_ABSORB
 				absorbed_now = true

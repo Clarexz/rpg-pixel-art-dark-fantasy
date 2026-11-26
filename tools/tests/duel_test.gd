@@ -1,8 +1,9 @@
 extends Node
-## Prueba automática de la v0.2.0 con dedos simulados:
+## Prueba automática del duelo con dedos simulados (desde v0.2.0; desde
+## v0.5.0 contra el Lobo de ceniza, el rival con memoria):
 ## 1) stick de una mano (avanzar y girar), 2) modo por casillas,
-## 3) primer golpe al cubo -> duelo, 4) atacar, 5) bloqueo perfecto,
-## 6) hechizo con su canción, 7) huir y que el cubo lo recuerde.
+## 3) primer golpe al lobo -> duelo, 4) atacar, 5) bloqueo perfecto,
+## 6) hechizo con su canción, 7) huir y que el lobo lo recuerde.
 ## Corre en CI con: godot --headless --path . res://tools/tests/duel_test.tscn
 
 const GREYBOX: PackedScene = preload("res://world/greybox/greybox.tscn")
@@ -12,7 +13,7 @@ var _world: Node3D
 var _player: Player
 var _one: OneHandControls
 var _duel: Duel
-var _rival: RivalCube
+var _rival: Enemy
 var _ui: DuelUI
 
 
@@ -20,12 +21,13 @@ func _ready() -> void:
 	RivalRegistry.save_enabled = false
 	Piedra.save_enabled = false
 	Piedra.use_record(PlayerRecord.new())
+	Inventory.save_enabled = false
 	_world = GREYBOX.instantiate()
 	add_child(_world)
 	_player = _world.get_node("Player")
 	_one = _world.get_node("HUD/SafeArea/OneHandControls")
 	_duel = _world.get_node("Duel")
-	_rival = _world.get_node("Rivals/RivalCube")
+	_rival = _world.get_node("Enemies/AshWolf")
 	_ui = _duel.get_node("SafeArea/DuelUI")
 	await _frames(10)
 	_player.settings.haptics_enabled = false
@@ -84,10 +86,10 @@ func _run() -> void:
 	_player.settings.move_mode = ControlSettings.MODE_TANK
 	_world.apply_mode()
 
-	# 3) Primer golpe: ponerse frente al cubo y tocar ATACAR.
-	print("Paso 3: Primer golpe: ponerse frente al cubo y tocar ATACAR.")
-	var cube_pos: Vector3 = _rival.global_position
-	_player.global_position = cube_pos + Vector3(0, 0, 2.2)
+	# 3) Primer golpe: ponerse frente al lobo y tocar ATACAR.
+	print("Paso 3: Primer golpe: ponerse frente al lobo y tocar ATACAR.")
+	var wolf_pos: Vector3 = _rival.global_position
+	_player.global_position = wolf_pos + Vector3(0, 0, 2.2)
 	_player.face_direction(Vector3(0, 0, -1))
 	await _frames(3)
 	_check(_world.get_node("%StoneLabel").visible, "la piedra no avisó que hay un rival cerca")
@@ -97,7 +99,7 @@ func _run() -> void:
 	await _frames(2)
 	_touch(0, center, false)
 	await _until(func() -> bool: return _duel.phase == &"menu", 5.0)
-	_check(_duel.phase == &"menu", "el golpe al cubo no inició el duelo (fase %s)" % _duel.phase)
+	_check(_duel.phase == &"menu", "el golpe al lobo no inició el duelo (fase %s)" % _duel.phase)
 	_check(_rival.hp == _rival.max_hp - Duel.FIRST_STRIKE_DAMAGE, "el primer golpe no hizo daño")
 	_check(not _one.visible, "los controles de exploración siguen visibles en el duelo")
 
@@ -111,7 +113,7 @@ func _run() -> void:
 		await _tap(_ui.button_for(&"cell", side))
 		await _until(func() -> bool: return _duel.phase == &"melee", 3.0)
 	_check(_duel.pa == pa_before - 2 * Duel.ATTACK_COST, "los golpes no gastaron PA (%d -> %d)" % [pa_before, _duel.pa])
-	_check(_rival.hp < rival_before, "los golpes no le bajaron vida al cubo")
+	_check(_rival.hp < rival_before, "los golpes no le bajaron vida al lobo")
 	await _tap(_ui.button_for(&"end", 0))
 
 	# 5) Turno del rival: bloquear justo antes del impacto = perfecto.
@@ -140,7 +142,7 @@ func _run() -> void:
 	var hp_before: int = _duel.hp
 	await _block_rival_turn(false)
 	_check(_duel.hp < hp_before, "no bloquear no hizo daño")
-	for attempt: int in 6:
+	for attempt: int in 12:
 		await _until(func() -> bool: return _duel.phase == &"menu" or not _duel.is_active(), 10.0)
 		if not _duel.is_active() or _duel.result == &"fled":
 			break
@@ -153,22 +155,22 @@ func _run() -> void:
 	_check(_one.visible, "los controles no regresaron al salir del duelo")
 	var registry: RivalRegistry = _world.get("_rivals")
 	var memory: RivalMemory = registry.memory_for(_rival.data.id)
-	_check(memory.duels == 1 and memory.last_result == "fled", "el cubo no recordó el duelo")
-	_check(memory.attack_counts[0] == 1 and memory.attack_counts[2] == 1, "el cubo no recordó tus golpes (%s)" % str(memory.attack_counts))
-	_check(memory.spell_counts.get("Fuego", 0) == 1, "el cubo no recordó tu Fuego")
+	_check(memory.duels == 1 and memory.last_result == "fled", "el lobo no recordó el duelo")
+	_check(memory.attack_counts[0] == 1 and memory.attack_counts[2] == 1, "el lobo no recordó tus golpes (%s)" % str(memory.attack_counts))
+	_check(memory.spell_counts.get("Fuego", 0) == 1, "el lobo no recordó tu Fuego")
 	_check(Piedra.record.duels == 1 and Piedra.record.flees == 1, "la piedra no registró el duelo")
 	var hello: String = RivalDialogue.greeting(_rival.data, memory, RivalTactics.plan(_rival.data, memory))
 	_check(hello.begins_with("La última vez huiste"), "el saludo no menciona que huiste: %s" % hello)
 
-	# 8) Memoria: tras 3 duelos cubre tu lado favorito.
-	print("Paso 8: Memoria: tras 3 duelos cubre tu lado favorito.")
+	# 8) Memoria: cuando ya te conoce, cubre tu lado favorito.
+	print("Paso 8: Memoria: cuando ya te conoce, cubre tu lado favorito.")
 	memory.duels = 3
 	memory.attack_counts = [9, 1, 1]
 	_duel._tactics = RivalTactics.plan(_rival.data, memory)
 	var guards: Array[int] = [0, 0, 0]
 	for i: int in 200:
 		guards[_duel._pick_guard()] += 1
-	_check(guards[0] > 120, "el cubo no cubre tu lado favorito tras 3 duelos (%s)" % str(guards))
+	_check(guards[0] > 120, "el lobo no cubre tu lado favorito tras 3 duelos (%s)" % str(guards))
 	hello = RivalDialogue.greeting(_rival.data, memory, _duel._tactics)
 	_check(hello.contains("la izquierda"), "el saludo no menciona tu lado favorito: %s" % hello)
 

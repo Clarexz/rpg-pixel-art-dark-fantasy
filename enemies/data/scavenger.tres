@@ -1,0 +1,50 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://combat/enemy_data.gd" id="1"]
+[ext_resource type="Script" path="res://combat/enemy_move.gd" id="2"]
+[ext_resource type="Texture2D" path="res://enemies/sprites/scavenger.png" id="3"]
+
+[sub_resource type="Resource" id="m1"]
+script = ExtResource("2")
+id = &"tajo"
+display_name = "Tajo"
+kind = 0
+hits = 1
+damage = 8
+windup = Vector2(0.55, 0.9)
+
+[sub_resource type="Resource" id="m2"]
+script = ExtResource("2")
+id = &"doble_tajo"
+display_name = "Doble tajo"
+kind = 1
+hits = 2
+damage = 7
+windup = Vector2(0.45, 0.7)
+
+[sub_resource type="Resource" id="m3"]
+script = ExtResource("2")
+id = &"frenesi"
+display_name = "Frenesí"
+kind = 1
+hits = 3
+damage = 6
+windup = Vector2(0.4, 0.65)
+
+[resource]
+script = ExtResource("1")
+id = &"scavenger"
+display_name = "Carroñero"
+max_hp = 60
+power = 85
+weakness = "Fuego"
+pattern = PackedStringArray("tajo", "doble_tajo", "tajo", "doble_tajo")
+pattern_low = PackedStringArray("doble_tajo", "frenesi")
+loot = {"pocion": 0.5, "eter": 0.25}
+pixel_size = 0.036
+duel_distance = 3.6
+chase_speed = 3.2
+line_first_meet = "El carroñero chilla y saca sus dagas de hueso."
+line_defeated = "El carroñero se deshace en harapos."
+moves = Array[ExtResource("2")]([SubResource("m1"), SubResource("m2"), SubResource("m3")])
+sprite = ExtResource("3")
