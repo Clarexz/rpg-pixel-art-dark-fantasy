@@ -21,7 +21,7 @@ const ROWS: Array = [
 	["vertical_ratio", "Sensibilidad vertical (x)", 0.2, 2.0, 0.05],
 	["invert_y", "Invertir eje vertical"],
 	["fov", "Campo de visión (°)", 60.0, 110.0, 1.0],
-	["joystick_radius", "Tamaño del joystick", 60.0, 220.0, 1.0],
+	["controls_scale", "Tamaño de los controles", 0.7, 1.4, 0.05],
 	["joystick_deadzone", "Zona muerta del joystick", 0.0, 0.5, 0.01],
 	["joystick_floating", "Joystick aparece donde tocas"],
 	["haptics_enabled", "Vibración"],
@@ -100,6 +100,8 @@ func _build_rows() -> void:
 		_rows.add_child(slider)
 		var update_title: Callable = func(value: float) -> void:
 			var shown: String = str(int(value)) if row[4] >= 1.0 else "%.2f" % value
+			if prop == "controls_scale":
+				shown = "%d%%" % roundi(value * 100.0)
 			title.text = "%s: %s" % [row[1], shown]
 		update_title.call(slider.value)
 		slider.value_changed.connect(func(value: float) -> void:

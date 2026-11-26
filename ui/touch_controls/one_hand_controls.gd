@@ -62,26 +62,33 @@ func add_blocker(control: Control) -> void:
 
 
 ## Separación del botón de ataque respecto al borde del stick (mano derecha).
-const ATTACK_GAP: float = 80.0
+const BASE_STICK_RADIUS: float = 95.0
+const ATTACK_GAP: float = 62.0
 const ATTACK_LIFT: float = 0.0  # centrado con el stick (pedido de Caleb)
 ## Espacio plano entre el cuadrado de ataque y la media luna de la piedra.
 const STONE_GAP: float = 14.0
 
 
+## Radio del stick ya escalado (el modo una mano ignora joystick_radius).
+func _stick_radius() -> float:
+	return BASE_STICK_RADIUS * settings.controls_scale
+
+
 ## Rectángulos del conjunto relativos al ancla: [stick, ataque, piedra].
 ## Mano derecha: botones a la izquierda del stick; zurdo = reflejo en X.
 func _cluster_rects() -> Array[Rect2]:
-	var r: float = settings.joystick_radius
+	var s: float = settings.controls_scale
+	var r: float = _stick_radius()
 	var atk_size: Vector2 = _attack_button.get_box_size()
 	var stone_size: Vector2 = _scan_button.get_box_size()
-	var atk_center: Vector2 = Vector2(-(r + ATTACK_GAP), -ATTACK_LIFT)
+	var atk_center: Vector2 = Vector2(-(r + ATTACK_GAP * s), -ATTACK_LIFT * s)
 	var stone_center: Vector2 = Vector2(
-		atk_center.x, atk_center.y - atk_size.y * 0.5 - STONE_GAP - stone_size.y * 0.5)
+		atk_center.x, atk_center.y - atk_size.y * 0.5 - STONE_GAP * s - stone_size.y * 0.5)
 	if settings.left_handed:
 		atk_center.x = -atk_center.x
 		stone_center.x = -stone_center.x
 	# El stick incluye el aro de sprint (r + 8).
-	var stick_r: float = r + 8.0
+	var stick_r: float = r + 8.0 * s
 	return [
 		Rect2(Vector2(-stick_r, -stick_r), Vector2(stick_r, stick_r) * 2.0),
 		Rect2(atk_center - atk_size * 0.5, atk_size),
@@ -111,6 +118,8 @@ func _clamp_anchor(pos: Vector2) -> Vector2:
 func _layout() -> void:
 	if settings == null or not is_node_ready():
 		return
+	_attack_button.visual_scale = settings.controls_scale
+	_scan_button.visual_scale = settings.controls_scale
 	# Sin toques del jugador el ancla es el reposo de siempre; si ya se movió, solo se reajusta.
 	_anchor = _clamp_anchor(_anchor if _anchor_set else _rest_center())
 	if _finger == -1:
@@ -196,7 +205,7 @@ func _release_button(index: int) -> void:
 
 
 func _update_stick(pos: Vector2) -> void:
-	var radius: float = settings.joystick_radius
+	var radius: float = _stick_radius()
 	var offset: Vector2 = (pos - _center).limit_length(radius)
 	_knob = _center + offset
 	var amount: float = offset.length() / radius
@@ -265,17 +274,19 @@ func _in_stick_zone(pos: Vector2) -> bool:
 ## Dónde se dibuja el stick cuando nadie lo toca: abajo, del lado de la mano.
 func _rest_center() -> Vector2:
 	var rect: Rect2 = get_global_rect()
-	var r: float = settings.joystick_radius
-	var x: float = rect.end.x - r - 150.0
+	var s: float = settings.controls_scale
+	var r: float = _stick_radius()
+	var x: float = rect.end.x - r - 150.0 * s
 	if settings.left_handed:
-		x = rect.position.x + r + 150.0
-	return Vector2(x, rect.end.y - r - 70.0)
+		x = rect.position.x + r + 150.0 * s
+	return Vector2(x, rect.end.y - r - 70.0 * s)
 
 
 func _draw() -> void:
 	if settings == null:
 		return
-	var r: float = settings.joystick_radius
+	var s: float = settings.controls_scale
+	var r: float = _stick_radius()
 	var active: bool = _finger != -1
 	var center: Vector2 = (_center if active else _anchor) - global_position
 	var knob: Vector2 = (_knob if active else _anchor) - global_position
@@ -283,7 +294,7 @@ func _draw() -> void:
 	draw_circle(center, r, Color(0.77, 0.63, 0.47, alpha + 0.1))
 	draw_arc(center, r, 0.0, TAU, 64, Color(1, 1, 1, alpha + 0.15), 3.0, true)
 	if _sprinting:
-		draw_arc(center, r + 8.0, 0.0, TAU, 64, Color(1, 0.8, 0.2, 0.8), 4.0, true)
+		draw_arc(center, r + 8.0 * s, 0.0, TAU, 64, Color(1, 0.8, 0.2, 0.8), 4.0 * s, true)
 	# Las flechas llevan una sombra oscura para leerse sobre el café claro.
 	_draw_hints(center + Vector2(1.5, 1.5), r, Color(0.2, 0.12, 0.05, alpha + 0.3))
 	_draw_hints(center, r, Color(1, 1, 1, alpha + 0.4))

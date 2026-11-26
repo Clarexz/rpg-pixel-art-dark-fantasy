@@ -39,6 +39,14 @@ enum Shape { CIRCLE, SQUARE, HALF_MOON }
 ## (como el botón de disparo de los shooters móviles).
 @export var drag_looks: bool = false
 
+## Escala aplicada al tamaño base (la pone OneHandControls según los ajustes).
+## Afecta caja, radio, zona tocable y texto.
+var visual_scale: float = 1.0:
+	set(value):
+		visual_scale = value
+		_update_min_size()
+		queue_redraw()
+
 var pressed: bool = false
 
 
@@ -55,8 +63,8 @@ func set_pressed(value: bool) -> void:
 ## Tamaño de la caja que ocupa el botón, según su forma.
 func get_box_size() -> Vector2:
 	if shape == Shape.CIRCLE:
-		return Vector2.ONE * radius * 2.0
-	return box_size
+		return Vector2.ONE * radius * 2.0 * visual_scale
+	return box_size * visual_scale
 
 
 ## Centro del botón en coordenadas globales (para desempatar toques).
@@ -71,7 +79,7 @@ func _update_min_size() -> void:
 ## Zona tocable un poco más grande que el dibujo: los pulgares fallan.
 func hit_test(global_point: Vector2) -> bool:
 	if shape == Shape.CIRCLE:
-		return global_point.distance_to(hit_center()) <= radius * 1.2
+		return global_point.distance_to(hit_center()) <= radius * visual_scale * 1.2
 	# Cuadrado y media luna: su caja crecida un 20 %.
 	var box: Vector2 = get_box_size()
 	return Rect2(hit_center() - box * 0.6, box * 1.2).has_point(global_point)
@@ -86,7 +94,7 @@ func _shape_points(scale_factor: float) -> PackedVector2Array:
 			var center: Vector2 = box * 0.5
 			for i: int in 48:
 				var a: float = TAU * i / 48.0
-				points.append(center + Vector2(cos(a), sin(a)) * radius * scale_factor)
+				points.append(center + Vector2(cos(a), sin(a)) * radius * visual_scale * scale_factor)
 		Shape.SQUARE:
 			var center: Vector2 = box * 0.5
 			var half: Vector2 = box * 0.5 * scale_factor
@@ -113,13 +121,13 @@ func _draw() -> void:
 	draw_polyline(outline, Color(1, 1, 1, 0.6), 3.0, true)
 	var box: Vector2 = get_box_size()
 	var font: Font = get_theme_default_font()
-	var font_size: int = int(radius * 0.45)
+	var font_size: int = int(radius * visual_scale * 0.45)
 	var text_center: Vector2 = box * 0.5
 	match shape:
 		Shape.SQUARE:
-			font_size = int(box.y * 0.22)
+			font_size = int(box.y * 0.23)
 		Shape.HALF_MOON:
-			font_size = int(box.y * 0.3)
+			font_size = int(box.y * 0.31)
 			text_center = Vector2(box.x * 0.5, box.y - font_size * 0.65)
 	var text_size: Vector2 = font.get_string_size(label, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size)
 	var baseline: Vector2 = text_center + Vector2(-text_size.x * 0.5, font_size * 0.35)

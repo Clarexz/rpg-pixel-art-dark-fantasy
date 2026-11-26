@@ -15,6 +15,7 @@ sprint_threshold = 0.95
 move_mode = 0
 left_handed = false
 tank_turn_speed = 140.0
+controls_scale = 1.0
 show_song_hints = true
 haptics_enabled = true
 haptic_ms = 20

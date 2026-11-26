@@ -41,6 +41,9 @@ const MODE_TWIN: int = 2  ## Dos pulgares, como v0.1.0.
 ## Grados por segundo que giras con el stick de una mano empujado al lado.
 @export_range(60.0, 300.0, 5.0) var tank_turn_speed: float = 140.0
 
+## Escala de todo el grupo de una mano: stick, botones y separaciones.
+@export_range(0.7, 1.4, 0.05) var controls_scale: float = 1.0
+
 @export_group("Combate")
 ## Mostrar qué botones tocar en las canciones de los hechizos (modo aprendizaje).
 @export var show_song_hints: bool = true

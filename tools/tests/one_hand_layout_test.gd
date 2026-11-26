@@ -41,7 +41,7 @@ func _ready() -> void:
 
 func _run() -> void:
 	var rect: Rect2 = _one.get_global_rect()
-	var r: float = _one.settings.joystick_radius
+	var r: float = _one._stick_radius()
 
 	# 1) Toque del stick en P y soltar: el conjunto se muda a P y se queda.
 	print("Paso 1: el conjunto sigue al pulgar y se queda al soltar.")
@@ -89,10 +89,38 @@ func _run() -> void:
 	_touch(0, p, false)
 	await _frames(2)
 	var anchor: Vector2 = _one._anchor
-	_check(absf(_attack.hit_center().x - (anchor.x + r + OneHandControls.ATTACK_GAP)) <= 1.0, "zurdo: ataque no está a R+80 a la derecha (x=%.1f, ancla=%.1f)" % [_attack.hit_center().x, anchor.x])
+	_check(absf(_attack.hit_center().x - (anchor.x + r + OneHandControls.ATTACK_GAP * _one.settings.controls_scale)) <= 1.0, "zurdo: ataque no está a R+GAP a la derecha (x=%.1f, ancla=%.1f)" % [_attack.hit_center().x, anchor.x])
 	_check(absf(_stone.hit_center().x - _attack.hit_center().x) <= 1.0, "zurdo: la piedra no está sobre el ataque")
 	_check_inside(rect, r, "zurdo")
 	_one.settings.left_handed = false
+	_world.apply_mode()
+	await _frames(3)
+
+	# 5) Escala 1.3: stick, botones y separación crecen 1.3x y todo sigue cabiendo.
+	print("Paso 5: controls_scale = 1.3 escala el conjunto y cabe en pantalla.")
+	_one.settings.controls_scale = 1.0
+	_world.apply_mode()
+	await _frames(3)
+	var r1: float = _one._stick_radius()
+	var atk1: Vector2 = _attack.get_box_size()
+	var gap1: float = _attack.hit_center().distance_to(_one._anchor) - r1
+	_one.settings.controls_scale = 1.3
+	_world.apply_mode()
+	await _frames(3)
+	var r2: float = _one._stick_radius()
+	_check(absf(r2 - r1 * 1.3) <= 1.0, "escala: radio del stick %.1f != %.1f" % [r2, r1 * 1.3])
+	_check(absf(_attack.get_box_size().x - atk1.x * 1.3) <= 1.0, "escala: caja de ataque %s" % _attack.get_box_size())
+	_check(absf(_attack.size.x - atk1.x * 1.3) <= 1.0, "escala: size del nodo de ataque %s" % _attack.size)
+	var gap2: float = _attack.hit_center().distance_to(_one._anchor) - r2
+	_check(absf(gap2 - gap1 * 1.3) <= 1.0, "escala: separación %.1f != %.1f" % [gap2, gap1 * 1.3])
+	_check_inside(rect, r2, "escala 1.3")
+	var corner: Vector2 = Vector2(rect.position.x + 2.0, rect.position.y + 2.0)
+	_touch(0, corner, true)
+	await _frames(2)
+	_touch(0, corner, false)
+	await _frames(2)
+	_check_inside(rect, r2, "escala 1.3, esquina superior")
+	_one.settings.controls_scale = 1.0
 	_world.apply_mode()
 	await _frames(3)
 
@@ -102,8 +130,8 @@ func _check_cluster(p: Vector2, r: float, when: String) -> void:
 	var anchor: Vector2 = _one._anchor
 	_check(anchor.distance_to(p) <= 1.0, "%s: el ancla no está en el toque (%s vs %s)" % [when, anchor, p])
 	var a: Vector2 = _attack.hit_center()
-	_check(absf(a.x - (anchor.x - r - OneHandControls.ATTACK_GAP)) <= 1.0, "%s: ataque no está a R+80 a la izquierda (x=%.1f)" % [when, a.x])
-	_check(absf(a.y - (anchor.y - OneHandControls.ATTACK_LIFT)) <= 1.0, "%s: ataque no está 40 px arriba del centro (y=%.1f)" % [when, a.y])
+	_check(absf(a.x - (anchor.x - r - OneHandControls.ATTACK_GAP * _one.settings.controls_scale)) <= 1.0, "%s: ataque no está a R+GAP a la izquierda (x=%.1f)" % [when, a.x])
+	_check(absf(a.y - (anchor.y - OneHandControls.ATTACK_LIFT * _one.settings.controls_scale)) <= 1.0, "%s: ataque no está ATTACK_LIFT arriba del centro (y=%.1f)" % [when, a.y])
 	_check(absf(_stone.hit_center().x - a.x) <= 1.0, "%s: la piedra no está centrada sobre el ataque" % when)
 
 
