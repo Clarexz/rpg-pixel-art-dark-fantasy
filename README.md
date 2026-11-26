@@ -2,9 +2,11 @@
 
 RPG de mundo abierto en primera persona para celular **en vertical**, con estética pixel art y rivales con memoria. Hecho con **Godot 4.7.2** (GDScript con tipado estático). Plataforma inicial: Android.
 
-Estado: **v0.3.0, rivales con memoria y piedra (lógica)**. Cada rival aprende solo de sus duelos contigo y la piedra lee su poder: ver [`docs/rivales-y-piedra.md`](docs/rivales-y-piedra.md). Base: prototipo a una mano. Exploración en primera persona con un solo pulgar (libre o por casillas) y un duelo por turnos contra un cubo de prueba que te recuerda. Ver [`docs/prototipo-una-mano.md`](docs/prototipo-una-mano.md). La fase 1 (dos pulgares) sigue disponible en Ajustes: [`docs/fase-1-controles.md`](docs/fase-1-controles.md).
+Estado: **v0.5.0, combate real (fase 3)**. Tres enemigos en pixel art que patrullan el nivel gris, te ven y te persiguen: el **Carroñero** (rápido, combos), el **Gólem de escoria** (lento, golpe cargado) y el **Lobo de ceniza**, el rival que te recuerda (fintas). Items guardados con botín, y huir depende de lo que lee tu piedra. Ver [`docs/combate-real.md`](docs/combate-real.md).
 
-**v0.4.0, pipeline pixel art:** el mundo 3D se dibuja a baja resolución y se estira nítido; enemigos como sprites billboard; monitor de rendimiento y prueba de estrés en Ajustes. Ver [`docs/pipeline-pixel-art.md`](docs/pipeline-pixel-art.md).
+Cómo se juega (sin cambios desde v0.2.0): exploración en primera persona con **un pulgar** y duelos **por turnos con botones**: menú Cuerpo a cuerpo / Hechizos / Items / Huir, cuadrícula 2x3 (abajo atacas con PA, arriba bloqueas), hechizos como "canciones". Ver [`docs/prototipo-una-mano.md`](docs/prototipo-una-mano.md).
+
+Versiones anteriores: v0.4.0 pipeline pixel art ([`docs/pipeline-pixel-art.md`](docs/pipeline-pixel-art.md)), v0.3.0 rivales con memoria y piedra ([`docs/rivales-y-piedra.md`](docs/rivales-y-piedra.md)), v0.1.0 controles a dos pulgares, aún en Ajustes ([`docs/fase-1-controles.md`](docs/fase-1-controles.md)).
 
 ## Descargar y probar en tu Android
 
@@ -25,14 +27,17 @@ La carpeta `.godot/` es caché que el editor regenera (como `node_modules` o `.n
 | Carpeta | Qué va ahí |
 |---|---|
 | `player/` | Jugador: movimiento, cámara en primera persona, controles táctiles |
-| `rivals/` | Rivales con memoria. Hoy: `RivalMemory` y el cubo de prueba (`rivals/test_cube/`) |
+| `enemies/` | Enemigos en el mundo (`enemy.gd`: patrulla, persigue, animaciones), sus fichas (`enemies/data/`) y sprites |
+| `rivals/` | Rivales con memoria: `RivalData`, `RivalMemory`, tácticas y saludos. Fichas en `rivals/data/` |
+| `items/` | Inventario guardado y catálogo de items |
 | `piedra/` | La piedra mágica: poder, lectura (scouter), memoria del mundo |
-| `combat/` | El duelo por turnos: reglas (`duel.gd`) y su pantalla (`duel_ui.gd`) |
+| `combat/` | El duelo por turnos: reglas (`duel.gd`), su pantalla (`duel_ui.gd`), fichas de enemigo (`enemy_data.gd`, `enemy_move.gd`) y patrones (`enemy_ai.gd`) |
 | `world/` | Niveles y zonas. `world/greybox/` es el nivel gris de la fase 1; `world/demo/` el cubo de la fase 0 |
 | `ui/` | HUD y menús. `ui/safe_area/` respeta notch y barra de gestos |
 | `core/` | Autoloads (globales). Hoy: `Sfx`, sonidos placeholder generados por código |
 | `assets/` | Arte y audio compartido entre features |
 | `tools/ci/` | Scripts que usa GitHub Actions |
+| `tools/art/` | Generador de los sprites placeholder (`make_enemy_sprites.py`) |
 | `tools/tests/` | Pruebas automáticas (p. ej. dedos simulados sobre los controles) |
 | `docs/` | Guías y notas de diseño |
 

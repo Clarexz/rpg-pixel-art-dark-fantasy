@@ -41,5 +41,5 @@ static func greeting(data: RivalData, memory: RivalMemory, tactics: RivalTactics
 	return line
 
 
-static func defeated(data: RivalData) -> String:
+static func defeated(data: EnemyData) -> String:
 	return data.line_defeated

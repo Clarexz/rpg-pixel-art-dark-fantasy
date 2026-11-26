@@ -1,4 +1,4 @@
-[gd_scene load_steps=18 format=3]
+[gd_scene load_steps=21 format=3]
 
 [ext_resource type="Script" path="res://world/greybox/greybox.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://player/player.tscn" id="2_player"]
@@ -9,7 +9,10 @@
 [ext_resource type="PackedScene" path="res://ui/touch_controls/touch_controls.tscn" id="7_touch"]
 [ext_resource type="PackedScene" path="res://ui/settings/control_settings_panel.tscn" id="8_panel"]
 [ext_resource type="PackedScene" path="res://ui/touch_controls/one_hand_controls.tscn" id="9_one"]
-[ext_resource type="PackedScene" path="res://rivals/test_cube/rival_cube.tscn" id="10_cube"]
+[ext_resource type="PackedScene" path="res://enemies/enemy.tscn" id="10_enemy"]
+[ext_resource type="Resource" path="res://enemies/data/scavenger.tres" id="13_scav"]
+[ext_resource type="Resource" path="res://enemies/data/slag_golem.tres" id="14_golem"]
+[ext_resource type="Resource" path="res://rivals/data/ash_wolf.tres" id="15_wolf"]
 [ext_resource type="PackedScene" path="res://combat/duel.tscn" id="11_duel"]
 [ext_resource type="Script" path="res://ui/transitions/pixelate_transition.gd" id="12_pix"]
 
@@ -213,10 +216,22 @@ power_reading = "???"
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 4)
 power_reading = "Similar"
 
-[node name="Rivals" type="Node3D" parent="."]
+[node name="Enemies" type="Node3D" parent="."]
 
-[node name="RivalCube" parent="Rivals" instance=ExtResource("10_cube")]
+[node name="Scavenger" parent="Enemies" instance=ExtResource("10_enemy")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, -6)
+data = ExtResource("13_scav")
+
+[node name="SlagGolem" parent="Enemies" instance=ExtResource("10_enemy")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 0, -14)
+data = ExtResource("14_golem")
+patrol_radius = 2.0
+walk_speed = 0.6
+
+[node name="AshWolf" parent="Enemies" instance=ExtResource("10_enemy")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -17)
+data = ExtResource("15_wolf")
+respawn_time = 20.0
 
 [node name="Player" parent="." instance=ExtResource("2_player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 8)
@@ -311,7 +326,7 @@ theme_override_colors/font_color = Color(0.75, 0.55, 1, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 8
 theme_override_font_sizes/font_size = 30
-text = "La piedra vibra... hay un rival cerca"
+text = "La piedra vibra... algo se acerca"
 horizontal_alignment = 1
 
 [node name="SettingsPanel" parent="HUD" instance=ExtResource("8_panel")]

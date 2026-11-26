@@ -94,9 +94,11 @@ Faltan los elementos 1, 2, 4 y 5. Para infringir hay que cumplir todos, y la **d
 
 ## Cómo se conecta al duelo (cambios mínimos)
 
+> **Desde v0.5.0** el cubo ya no está en el nivel: el rival jugable es el **Lobo de ceniza** y el cubo solo vive en las pruebas y la simulación. Los enemigos comunes (Carroñero, Gólem) no tienen memoria. Ver [combate-real.md](combate-real.md).
+
 - `combat/duel.gd`: al empezar calcula `RivalTactics.plan(...)`; la guardia, el tiempo de aviso, los golpes por turno y el daño de hechizos salen de ahí. Va llenando un `Encounter` y al final lo entrega a la memoria del rival y a la piedra (`_save_encounter()`).
 - Al empezar el duelo verás la **lectura de la piedra** arriba de las instrucciones, y el saludo del rival según lo que recuerda.
-- `rivals/test_cube/rival_cube.gd` ahora tiene `data: RivalData` (por defecto `rivals/data/test_cube.tres`).
+- (v0.3.0) El cubo tenía `data: RivalData`. Desde v0.5.0 todo enemigo en el mundo es `enemies/enemy.gd` con su ficha (`EnemyData` o `RivalData`).
 - `world/greybox/greybox.gd` usa `RivalRegistry` en vez de una sola memoria. El guardado viejo (`user://rival_memory.tres`) ya no se usa: el cubo te "olvida" una vez al actualizar.
 
 ## Simulación de 10 duelos
@@ -120,7 +122,7 @@ Cada rival recuerda solo sus 5 duelos, el lobo (más astuto) aprende un duelo an
 
 ## Qué probar en el celular
 
-1. Pelea con el cubo y fíjate en la línea "Piedra: ..." al empezar.
+1. Pelea con el Lobo de ceniza (desde v0.5.0; antes el cubo) y fíjate en la línea "Piedra: ..." al empezar.
 2. Ataca casi siempre por un lado durante 3 duelos: en el 4.º te lo dice y lo cubre.
 3. Usa Fuego en varios duelos: después dirá "Tu Fuego ya no me asusta" y verás "¡Lo resiste!".
 4. Remátalo con Trueno (su debilidad): verás "¡Su debilidad!" y luego volverá con la cicatriz.

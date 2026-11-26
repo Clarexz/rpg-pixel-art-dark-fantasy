@@ -3,7 +3,7 @@ extends Control
 ## Pantalla del duelo, pensada para UN pulgar en vertical:
 ##
 ##   ┌───────────────────┐
-##   │ Cubo   [████░░]   │  arriba: rival y lo que dice (solo se lee)
+##   │ Lobo   [████░░]   │  arriba: enemigo y lo que dice (solo se lee)
 ##   │ "La última vez…"  │
 ##   │                   │
 ##   │   (!)   ◯→        │  centro: el rival y la flecha + aro de su ataque
@@ -42,6 +42,7 @@ var left_handed: bool = false
 
 var _rival_name: Label
 var _rival_bar: ProgressBar
+var _status: Label
 var _dialog: Label
 var _prompt: Label
 var _hp_bar: ProgressBar
@@ -92,6 +93,12 @@ func set_stats(hp: int, max_hp: int, pa: int, max_pa: int, pm: int, max_pm: int)
 	_pm_label.text = "PM %d" % pm
 
 
+## Estado del enemigo debajo de su barra (p. ej. "Cargando..."). "" = nada.
+func status(text: String) -> void:
+	_status.text = text
+	_status.visible = not text.is_empty()
+
+
 func say(text: String) -> void:
 	_dialog.text = text
 
@@ -101,13 +108,14 @@ func prompt(text: String) -> void:
 
 
 ## Menú principal del turno: 4 botones grandes en 2x2.
-func show_menu() -> void:
+## flee_hint = qué tan fácil es huir según tu piedra ("fácil", "difícil"...).
+func show_menu(flee_hint: String = "") -> void:
 	_set_util(false, false)
 	_fill(2, [
 		_def("Cuerpo a\ncuerpo", &"menu", 0, COLOR_ATTACK),
 		_def("Hechizos", &"menu", 1, COLOR_GUARD),
 		_def("Items", &"menu", 2, COLOR_MENU),
-		_def("Huir", &"menu", 3, COLOR_NEUTRAL),
+		_def("Huir" if flee_hint.is_empty() else "Huir\n(%s)" % flee_hint, &"menu", 3, COLOR_NEUTRAL),
 	])
 
 
@@ -171,8 +179,19 @@ func hide_song() -> void:
 	_song.hide()
 
 
-func telegraph(side: int, windup: float, perfect_window: float) -> void:
-	_telegraph.start(side, windup, perfect_window)
+## feint = aviso de finta (aro morado con "?"): va a cambiar de lado.
+func telegraph(side: int, windup: float, perfect_window: float, feint: bool = false) -> void:
+	_telegraph.start(side, windup, perfect_window, feint)
+
+
+## La finta cambia de lado sin reiniciar el aro.
+func retarget(side: int) -> void:
+	_telegraph.retarget(side)
+
+
+## Antes de un combo: muestra los lados en orden (1, 2, 3).
+func preview(sides: Array[int]) -> void:
+	_telegraph.preview(sides)
 
 
 func clear_telegraph() -> void:
@@ -249,6 +268,11 @@ func _build() -> void:
 	top_box.add_child(_rival_name)
 	_rival_bar = _bar(Color(0.75, 0.2, 0.25), 22)
 	top_box.add_child(_rival_bar)
+	_status = Label.new()
+	_status.add_theme_color_override("font_color", Color(1, 0.85, 0.3))
+	_status.add_theme_font_size_override("font_size", 28)
+	_status.hide()
+	top_box.add_child(_status)
 	_dialog = Label.new()
 	_dialog.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_dialog.add_theme_color_override("font_color", Color(1, 0.88, 0.6))

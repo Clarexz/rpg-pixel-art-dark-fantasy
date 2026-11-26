@@ -1,5 +1,7 @@
 # v0.2.0: prototipo a una mano (exploración + duelo)
 
+> **Desde v0.5.0** el cubo fue reemplazado por enemigos de verdad (Carroñero, Gólem de escoria y el rival Lobo de ceniza), con movimientos propios, items guardados y huir según la piedra. Las reglas de este documento (menú, cuadrícula 2x3, bloqueo perfecto, canciones) siguen igual. Lo nuevo está en [combate-real.md](combate-real.md).
+
 Objetivo: comprobar si el juego **se puede jugar con un solo pulgar en vertical**, y si el duelo por turnos con la cuadrícula de botones se siente bien. Todo es placeholder: un rival (un cubo), sonidos generados por código, sin arte.
 
 ## Cómo se juega

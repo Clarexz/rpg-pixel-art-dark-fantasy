@@ -9,6 +9,8 @@ extends RefCounted
 
 ## Con quién fue el duelo (RivalData.id).
 var rival_id: StringName = &""
+## false = enemigo común (sin memoria): da XP pero no fragmento de piedra.
+var is_rival: bool = true
 ## Dónde pasó (para la reputación por zona).
 var zone: StringName = &"greybox"
 ## &"win" (ganaste tú), &"lose" (perdiste) o &"fled" (huiste).

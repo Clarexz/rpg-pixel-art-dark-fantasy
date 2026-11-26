@@ -24,7 +24,7 @@ var text: String = ""
 
 ## Poder actual de un rival: su base + lo que creció venciéndote A TI.
 ## Solo usa la memoria de ESE rival.
-static func rival_power(data: RivalData, memory: RivalMemory) -> int:
+static func rival_power(data: EnemyData, memory: RivalMemory) -> int:
 	var wins_over_player: int = memory.player_losses if memory != null else 0
 	return data.power + RIVAL_POWER_PER_WIN * wins_over_player
 

@@ -1,14 +1,16 @@
 extends Node3D
-## Escena principal: nivel gris para probar controles y el duelo.
+## Escena principal: nivel gris para probar controles y el combate.
 ##
 ## Este script es el "padre" que conecta a los hijos entre sí: escucha las
-## señales de los controles y de los rivales y llama métodos de Player y
+## señales de los controles y de los enemigos y llama métodos de Player y
 ## Duel ("call down, signal up").
 ## Analogía web: el componente contenedor que pasa callbacks entre hermanos.
 
 var _settings: ControlSettings
 ## La memoria de cada rival, guardada por id.
 var _rivals: RivalRegistry
+## Tus items (se guardan en el celular).
+var _inventory: Inventory
 var _stone_timer: float = 0.0
 
 @onready var _player: Player = $Player
@@ -29,6 +31,7 @@ func _ready() -> void:
 	# Un solo objeto de ajustes compartido por todos (como un Context de React).
 	_settings = ControlSettings.load_or_default()
 	_rivals = RivalRegistry.load_or_new()
+	_inventory = Inventory.load_or_new()
 	_player.settings = _settings
 	_touch.settings = _settings
 	_one_hand.settings = _settings
@@ -50,8 +53,8 @@ func _ready() -> void:
 	_panel.closed.connect(_on_settings_closed)
 	_duel.finished.connect(_on_duel_finished)
 	_duel.memory_saved.connect(func(_m: RivalMemory) -> void: _rivals.save())
-	for rival: Node in get_tree().get_nodes_in_group("rival"):
-		(rival as RivalCube).engaged.connect(_on_rival_engaged)
+	for enemy: Node in get_tree().get_nodes_in_group("enemy"):
+		(enemy as Enemy).engaged.connect(_on_enemy_engaged)
 	apply_mode()
 
 
@@ -80,12 +83,12 @@ func _process(delta: float) -> void:
 	_update_stone(delta)
 
 
-## La piedra vibra cuando hay un rival cerca: más seguido entre más cerca.
+## La piedra vibra cuando hay un enemigo cerca: más seguido entre más cerca.
 func _update_stone(delta: float) -> void:
 	var closeness: float = 0.0
 	if not _duel.is_active():
-		for rival: Node in get_tree().get_nodes_in_group("rival"):
-			closeness = maxf(closeness, (rival as RivalCube).closeness_to(_player.global_position))
+		for enemy: Node in get_tree().get_nodes_in_group("enemy"):
+			closeness = maxf(closeness, (enemy as Enemy).closeness_to(_player.global_position))
 	_stone_label.visible = closeness > 0.0
 	if closeness <= 0.0:
 		_stone_timer = 0.0
@@ -99,7 +102,7 @@ func _update_stone(delta: float) -> void:
 		create_tween().tween_property(_stone_label, "modulate:a", 0.35, _stone_timer * 0.8)
 
 
-func _on_rival_engaged(rival: RivalCube, advantage: StringName) -> void:
+func _on_enemy_engaged(enemy: Enemy, advantage: StringName) -> void:
 	if _duel.is_active() or _panel.visible:
 		return
 	_touch.release_all()
@@ -110,7 +113,9 @@ func _on_rival_engaged(rival: RivalCube, advantage: StringName) -> void:
 	_settings_button.hide()
 	_stone_label.hide()
 	_hud.hide()  # el duelo tiene su propia pantalla
-	_duel.start(_player, rival, advantage, _settings, _rivals.memory_for(rival.data.id), _transition)
+	# Solo los rivales tienen memoria; los enemigos comunes no recuerdan nada.
+	var memory: RivalMemory = _rivals.memory_for(enemy.data.id) if enemy.is_rival() else null
+	_duel.start(_player, enemy, advantage, _settings, memory, _inventory, _transition)
 
 
 func _on_duel_finished(_result: StringName) -> void:
