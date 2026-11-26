@@ -83,7 +83,7 @@ Para el prototipo, el cubo reaparece a los 4 segundos de vencerlo, y si pierdes 
 | `ui/touch_controls/one_hand_controls.gd` | Stick de un pulgar (libre y por casillas) y botones del lado de la mano |
 | `player/player.gd` | Giro de tanque, pasos por casillas, animaciones del duelo |
 | `rivals/test_cube/rival_cube.gd` | El cubo: te nota, te embosca, animaciones |
-| `rivals/rival_memory.gd` | Lo que el cubo recuerda y su saludo |
+| `rivals/` y `piedra/` | Memoria de rivales, tácticas, saludos y la piedra: ver [rivales-y-piedra.md](rivales-y-piedra.md) |
 | `combat/duel.gd` | **Reglas del duelo** (números arriba del archivo, fáciles de ajustar) |
 | `combat/duel_ui.gd` | Pantalla del duelo, construida por código |
 | `combat/telegraph_view.gd`, `combat/song_display.gd` | La flecha con aro y la "partitura" de los hechizos |

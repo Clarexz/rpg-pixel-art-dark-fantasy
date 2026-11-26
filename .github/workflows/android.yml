@@ -94,6 +94,9 @@ jobs:
       - name: Prueba del duelo a una mano (dedos simulados)
         run: $GODOT --headless --path . res://tools/tests/duel_test.tscn
 
+      - name: Pruebas de rivales y piedra (lógica + simulación de 10 duelos)
+        run: timeout 300 $GODOT --headless --path . res://tools/tests/rivals_test.tscn
+
       - name: Versión
         id: version
         run: tools/ci/version.sh | tee -a "$GITHUB_OUTPUT"

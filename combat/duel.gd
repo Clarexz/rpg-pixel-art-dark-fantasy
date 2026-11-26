@@ -5,7 +5,7 @@ extends CanvasLayer
 ## Tu turno: menú Cuerpo a cuerpo / Hechizos / Items / Huir.
 ## - Cuerpo a cuerpo: fila de abajo = atacar izq/centro/der. Cada golpe
 ##   cuesta PA; puedes encadenar golpes mientras te alcance. El rival cubre
-##   un lado (al azar... hasta que te conoce: tras 3 duelos cubre tu favorito).
+##   un lado (al azar... hasta que te conoce: ver rivals/rival_tactics.gd).
 ## - Hechizos: eliges uno y tocas su "canción" (3-4 casillas) en la misma
 ##   cuadrícula. Cuesta PM. Si la tocas con ritmo parejo, sale más fuerte.
 ## - Items: poción (PV) o éter (PM). Gasta el turno.
@@ -18,6 +18,8 @@ extends CanvasLayer
 ## orden aunque espere toques del jugador y animaciones.
 
 signal finished(result: StringName)  # &"win", &"lose" o &"fled"
+## Ya se actualizó la memoria del rival (el mundo la guarda en disco).
+signal memory_saved(memory: RivalMemory)
 
 const PLAYER_MAX_HP: int = 100
 const PA_MAX: int = 10
@@ -64,6 +66,10 @@ var _player: Player
 var _rival: RivalCube
 var _settings: ControlSettings
 var _memory: RivalMemory
+## Cómo pelea el rival en ESTE duelo (sale de su memoria al empezar).
+var _tactics: RivalTactics
+## Lo que va pasando en este duelo; al final se entrega a la memoria.
+var _encounter: Encounter
 var _transition: PixelateTransition
 var _items: Array[Dictionary] = []
 var _aegis: bool = false
@@ -89,6 +95,10 @@ func start(player: Player, rival: RivalCube, advantage: StringName, settings: Co
 	_settings = settings
 	_memory = memory
 	_transition = transition
+	_tactics = RivalTactics.plan(rival.data, memory)
+	_encounter = Encounter.new()
+	_encounter.rival_id = rival.data.id
+	_encounter.advantage = advantage
 	hp = PLAYER_MAX_HP
 	pa = PA_START
 	pm = PM_START
@@ -156,7 +166,11 @@ func _intro(advantage: StringName) -> void:
 	_ui.banner("")
 	_ui.hide_song()
 	_ui.clear_telegraph()
-	_ui.say("%s: \"%s\"" % [_rival.display_name, _memory.greeting()])
+	var fame: String = Piedra.record.fame_title(_encounter.zone)
+	# Saludo según lo que recuerda + lectura de tu piedra (se queda visible).
+	_ui.say("%s: \"%s\"\n◆ Piedra: %s." % [_rival.display_name,
+			RivalDialogue.greeting(_rival.data, _memory, _tactics, fame),
+			Piedra.scan(_rival.data, _memory).text])
 	if advantage == &"player":
 		_rival.hp = maxi(_rival.hp - FIRST_STRIKE_DAMAGE, 1)
 		pa += 2
@@ -185,7 +199,7 @@ func _outro() -> void:
 			_rival.die()
 			Sfx.play(&"perfect", 0.7)
 			_ui.banner("¡VICTORIA!")
-			_ui.say("%s: \"...Recordaré esto.\"" % _rival.display_name)
+			_ui.say("%s: \"%s\"" % [_rival.display_name, RivalDialogue.defeated(_rival.data)])
 		&"lose":
 			Sfx.play(&"hurt", 0.6)
 			_ui.banner("Caíste...")
@@ -193,9 +207,7 @@ func _outro() -> void:
 		&"fled":
 			_ui.banner("Huiste")
 			_ui.say("%s: \"¡Eso, corre!\"" % _rival.display_name)
-	_memory.duels += 1
-	_memory.last_result = String(result)
-	_memory.save()
+	_save_encounter()
 	await _wait(1.4)
 	await _transition.cover(0.3)
 	_ui.hide()
@@ -281,7 +293,7 @@ func _player_attack(side: int) -> void:
 	phase = &"busy"
 	pa -= ATTACK_COST
 	stats.attacks += 1
-	_memory.attack_counts[side] += 1
+	_encounter.attack_sides[side] += 1
 	_ui.mark(&"cell", side + 3)
 	_player.swing(side)
 	Sfx.play(&"swing")
@@ -309,14 +321,7 @@ func _player_attack(side: int) -> void:
 ## Qué lado cubre el rival. Al principio adivina; cuando ya te conoce
 ## (memoria), cubre tu lado favorito la mayoría de las veces.
 func _pick_guard() -> int:
-	if _memory.adapts() and rng.randf() < 0.7:
-		return _memory.favorite_side()
-	var roll: float = rng.randf()
-	if roll < 0.3:
-		return 0
-	if roll < 0.7:
-		return 1
-	return 2
+	return _tactics.pick_guard(rng)
 
 
 func _spells() -> bool:
@@ -369,6 +374,14 @@ func _cast(index: int) -> bool:
 	if in_rhythm:
 		_ui.float_text("¡En ritmo! x1.5", Color(1, 0.85, 0.3), 1)
 	var power: int = int(int(spell.power) * mult)
+	var vs: float = _tactics.spell_multiplier(spell.name)
+	if spell.kind in [&"damage", &"stun"]:
+		power = int(power * vs)
+		if vs < 1.0:
+			_ui.float_text("¡Lo resiste!", Color(0.7, 0.7, 0.8), 2)
+		elif vs > 1.0:
+			_ui.float_text("¡Su debilidad!", Color(1, 0.85, 0.3), 2)
+	_encounter.add_spell(spell.name)
 	match spell.kind:
 		&"damage":
 			_rival.hp -= power
@@ -391,6 +404,8 @@ func _cast(index: int) -> bool:
 			_ui.flash(Color(1, 1, 0.6), 0.5)
 			_ui.float_text("Trueno -%d ¡aturdido!" % power, Color(1, 1, 0.6), 0)
 			await _hitstop(0.1)
+	if _rival.hp <= 0:
+		_encounter.finisher = spell.name
 	_refresh()
 	await _wait(0.7)
 	return true
@@ -462,7 +477,8 @@ func _flee() -> bool:
 # --- Turno del rival --------------------------------------------------------
 
 func _rival_turn() -> void:
-	var strikes: int = 1
+	_encounter.turns += 1
+	var strikes: int = 1 + _tactics.extra_strikes
 	if _rival.hp < _rival.max_hp * 0.66:
 		strikes += 1
 	if _rival.hp < _rival.max_hp * 0.33:
@@ -482,7 +498,7 @@ func _rival_turn() -> void:
 
 func _rival_strike() -> void:
 	var side: int = rng.randi_range(0, 2)
-	var windup: float = rng.randf_range(0.7, 1.2)
+	var windup: float = _tactics.pick_windup(rng)
 	telegraph_side = side
 	impact_at = _now() + windup
 	phase = &"block"
@@ -540,6 +556,20 @@ func _rival_strike() -> void:
 
 
 # --- Utilidades ---------------------------------------------------------------
+
+## Entrega lo que pasó a la memoria de ESTE rival y a tu piedra. Es el único
+## lugar donde un duelo cambia algo fuera de sí mismo.
+func _save_encounter() -> void:
+	_encounter.result = result
+	_encounter.perfect_blocks = int(stats.perfect)
+	_encounter.blocks = int(stats.blocked)
+	_encounter.hits_taken = int(stats.hit)
+	_memory.record(_encounter)
+	if Piedra.record.record(_encounter):
+		_ui.prompt("Absorbes un fragmento de su piedra. Tu piedra: nivel %d." % Piedra.record.level())
+	Piedra.save()
+	memory_saved.emit(_memory)
+
 
 func _refresh() -> void:
 	_ui.set_rival(_rival.display_name, maxi(_rival.hp, 0), _rival.max_hp)

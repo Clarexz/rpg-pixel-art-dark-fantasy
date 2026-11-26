@@ -7,7 +7,8 @@ extends Node3D
 ## Analogía web: el componente contenedor que pasa callbacks entre hermanos.
 
 var _settings: ControlSettings
-var _memory: RivalMemory
+## La memoria de cada rival, guardada por id.
+var _rivals: RivalRegistry
 var _stone_timer: float = 0.0
 
 @onready var _player: Player = $Player
@@ -27,7 +28,7 @@ var _feedback_tween: Tween
 func _ready() -> void:
 	# Un solo objeto de ajustes compartido por todos (como un Context de React).
 	_settings = ControlSettings.load_or_default()
-	_memory = RivalMemory.load_or_new()
+	_rivals = RivalRegistry.load_or_new()
 	_player.settings = _settings
 	_touch.settings = _settings
 	_one_hand.settings = _settings
@@ -48,6 +49,7 @@ func _ready() -> void:
 	_settings_button.pressed.connect(_open_settings)
 	_panel.closed.connect(_on_settings_closed)
 	_duel.finished.connect(_on_duel_finished)
+	_duel.memory_saved.connect(func(_m: RivalMemory) -> void: _rivals.save())
 	for rival: Node in get_tree().get_nodes_in_group("rival"):
 		(rival as RivalCube).engaged.connect(_on_rival_engaged)
 	apply_mode()
@@ -108,7 +110,7 @@ func _on_rival_engaged(rival: RivalCube, advantage: StringName) -> void:
 	_settings_button.hide()
 	_stone_label.hide()
 	_hud.hide()  # el duelo tiene su propia pantalla
-	_duel.start(_player, rival, advantage, _settings, _memory, _transition)
+	_duel.start(_player, rival, advantage, _settings, _rivals.memory_for(rival.data.id), _transition)
 
 
 func _on_duel_finished(_result: StringName) -> void:
