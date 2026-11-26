@@ -97,6 +97,9 @@ jobs:
       - name: Prueba del duelo a una mano (dedos simulados)
         run: timeout 300 $GODOT --headless --path . res://tools/tests/duel_test.tscn
 
+      - name: Prueba del conjunto de exploración (stick + botones flotantes)
+        run: timeout 300 $GODOT --headless --path . res://tools/tests/one_hand_layout_test.tscn
+
       - name: Pruebas de rivales y piedra (lógica + simulación de 10 duelos)
         run: timeout 300 $GODOT --headless --path . res://tools/tests/rivals_test.tscn
 

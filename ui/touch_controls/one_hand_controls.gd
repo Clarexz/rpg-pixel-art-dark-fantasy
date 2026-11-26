@@ -33,6 +33,10 @@ var grid_mode: bool = false
 
 var _finger: int = -1
 var _center: Vector2 = Vector2.ZERO
+## Ancla del conjunto stick + botones (coordenadas globales). Se mueve al
+## tocar la zona del stick y ahí se queda al soltar.
+var _anchor: Vector2 = Vector2.ZERO
+var _anchor_set: bool = false  # true cuando el jugador ya movió el ancla con un toque
 var _knob: Vector2 = Vector2.ZERO
 var _sprinting: bool = false
 var _held_dir: Vector2i = Vector2i.ZERO
@@ -57,24 +61,66 @@ func add_blocker(control: Control) -> void:
 	_blockers.append(control)
 
 
-## Acomoda los botones del lado de la mano. Llamar al cambiar "Modo zurdo".
+## Separación del botón de ataque respecto al borde del stick (mano derecha).
+const ATTACK_GAP: float = 80.0
+const ATTACK_LIFT: float = 40.0
+## Espacio plano entre el cuadrado de ataque y la media luna de la piedra.
+const STONE_GAP: float = 14.0
+
+
+## Rectángulos del conjunto relativos al ancla: [stick, ataque, piedra].
+## Mano derecha: botones a la izquierda del stick; zurdo = reflejo en X.
+func _cluster_rects() -> Array[Rect2]:
+	var r: float = settings.joystick_radius
+	var atk_size: Vector2 = _attack_button.get_box_size()
+	var stone_size: Vector2 = _scan_button.get_box_size()
+	var atk_center: Vector2 = Vector2(-(r + ATTACK_GAP), -ATTACK_LIFT)
+	var stone_center: Vector2 = Vector2(
+		atk_center.x, atk_center.y - atk_size.y * 0.5 - STONE_GAP - stone_size.y * 0.5)
+	if settings.left_handed:
+		atk_center.x = -atk_center.x
+		stone_center.x = -stone_center.x
+	# El stick incluye el aro de sprint (r + 8).
+	var stick_r: float = r + 8.0
+	return [
+		Rect2(Vector2(-stick_r, -stick_r), Vector2(stick_r, stick_r) * 2.0),
+		Rect2(atk_center - atk_size * 0.5, atk_size),
+		Rect2(stone_center - stone_size * 0.5, stone_size),
+	]
+
+
+## Acerca el ancla lo necesario para que todo el conjunto quepa en el control.
+func _clamp_anchor(pos: Vector2) -> Vector2:
+	var box: Rect2 = Rect2()
+	var first: bool = true
+	for rect: Rect2 in _cluster_rects():
+		box = rect if first else box.merge(rect)
+		first = false
+	var area: Rect2 = get_global_rect()
+	var lo: Vector2 = area.position - box.position
+	var hi: Vector2 = area.end - box.end
+	# Si el conjunto no cabe (pantalla diminuta), centra en vez de invertir el rango.
+	var out: Vector2 = pos
+	out.x = (lo.x + hi.x) * 0.5 if lo.x > hi.x else clampf(pos.x, lo.x, hi.x)
+	out.y = (lo.y + hi.y) * 0.5 if lo.y > hi.y else clampf(pos.y, lo.y, hi.y)
+	return out
+
+
+## Acomoda los botones alrededor del ancla. Se llama al cambiar el tamaño,
+## el modo zurdo o el ancla.
 func _layout() -> void:
 	if settings == null or not is_node_ready():
 		return
-	var w: float = size.x
-	var h: float = size.y
-	var left: bool = settings.left_handed
-	# Coordenadas pensadas para mano derecha; en zurdo se reflejan en X.
-	var spots: Array = [
-		[_attack_button, Vector2(w - 120.0, h - 470.0)],
-		[_scan_button, Vector2(w - 100.0, h - 650.0)],
-	]
-	for spot: Array in spots:
-		var button: ActionButton = spot[0]
-		var c: Vector2 = spot[1]
-		if left:
-			c.x = w - c.x
-		button.position = c - button.size * 0.5
+	# Sin toques del jugador el ancla es el reposo de siempre; si ya se movió, solo se reajusta.
+	_anchor = _clamp_anchor(_anchor if _anchor_set else _rest_center())
+	if _finger == -1:
+		_center = _anchor
+	var rects: Array[Rect2] = _cluster_rects()
+	var buttons: Array[ActionButton] = [_attack_button, _scan_button]
+	for i: int in buttons.size():
+		var button: ActionButton = buttons[i]
+		button.size = button.get_box_size()
+		button.position = _anchor + rects[i + 1].position - global_position
 	queue_redraw()
 
 
@@ -110,16 +156,26 @@ func _on_touch_down(index: int, pos: Vector2) -> bool:
 	for blocker: Control in _blockers:
 		if blocker.is_visible_in_tree() and blocker.get_global_rect().has_point(pos):
 			return false
+	# Si el toque cae en dos botones a la vez, gana el de centro más cercano.
+	var hit: ActionButton = null
 	for button: ActionButton in _buttons:
-		if button.is_visible_in_tree() and button.hit_test(pos):
-			_button_fingers[index] = button
-			button.set_pressed(true)
-			settings.pulse(0.5)
-			action_pressed.emit(button.action)
-			return true
+		if not button.is_visible_in_tree() or not button.hit_test(pos):
+			continue
+		if hit == null or pos.distance_to(button.hit_center()) < pos.distance_to(hit.hit_center()):
+			hit = button
+	if hit != null:
+		_button_fingers[index] = hit
+		hit.set_pressed(true)
+		settings.pulse(0.5)
+		action_pressed.emit(hit.action)
+		return true
 	if _finger == -1 and _in_stick_zone(pos):
 		_finger = index
-		_center = _clamp_center(pos)
+		# El conjunto entero se muda adonde cae el pulgar y ahí se queda al soltar.
+		_anchor = _clamp_anchor(pos)
+		_anchor_set = true
+		_center = _anchor
+		_layout()
 		_update_stick(pos)
 		return true
 	return false
@@ -216,24 +272,25 @@ func _rest_center() -> Vector2:
 	return Vector2(x, rect.end.y - r - 70.0)
 
 
-func _clamp_center(pos: Vector2) -> Vector2:
-	var rect: Rect2 = get_global_rect().grow(-settings.joystick_radius * 0.6)
-	return pos.clamp(rect.position, rect.end)
-
-
 func _draw() -> void:
 	if settings == null:
 		return
 	var r: float = settings.joystick_radius
 	var active: bool = _finger != -1
-	var center: Vector2 = (_center if active else _rest_center()) - global_position
-	var knob: Vector2 = (_knob if active else _rest_center()) - global_position
+	var center: Vector2 = (_center if active else _anchor) - global_position
+	var knob: Vector2 = (_knob if active else _anchor) - global_position
 	var alpha: float = 0.5 if active else 0.22
-	draw_circle(center, r, Color(0, 0, 0, alpha * 0.5))
-	draw_arc(center, r, 0.0, TAU, 64, Color(1, 1, 1, alpha), 3.0, true)
+	draw_circle(center, r, Color(0.77, 0.63, 0.47, alpha + 0.1))
+	draw_arc(center, r, 0.0, TAU, 64, Color(1, 1, 1, alpha + 0.15), 3.0, true)
 	if _sprinting:
 		draw_arc(center, r + 8.0, 0.0, TAU, 64, Color(1, 0.8, 0.2, 0.8), 4.0, true)
-	var hint: Color = Color(1, 1, 1, alpha + 0.1)
+	# Las flechas llevan una sombra oscura para leerse sobre el café claro.
+	_draw_hints(center + Vector2(1.5, 1.5), r, Color(0.2, 0.12, 0.05, alpha + 0.3))
+	_draw_hints(center, r, Color(1, 1, 1, alpha + 0.4))
+	draw_circle(knob, r * 0.42, Color(0.88, 0.78, 0.65, alpha + 0.3))
+
+
+func _draw_hints(center: Vector2, r: float, hint: Color) -> void:
 	if grid_mode:
 		# Cuatro flechas: paso adelante/atrás, giro izquierda/derecha.
 		for d: Vector2 in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]:
@@ -246,4 +303,3 @@ func _draw() -> void:
 		draw_arc(center, r - 14.0, -0.5, 0.5, 12, hint, 4.0, true)
 		var tip: Vector2 = center + Vector2.UP * (r - 10.0)
 		draw_colored_polygon(PackedVector2Array([tip, tip + Vector2(-16, 26), tip + Vector2(16, 26)]), hint)
-	draw_circle(knob, r * 0.42, Color(1, 1, 1, alpha + 0.15))
