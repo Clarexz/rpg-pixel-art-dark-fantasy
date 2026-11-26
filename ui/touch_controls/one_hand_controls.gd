@@ -63,7 +63,7 @@ func add_blocker(control: Control) -> void:
 
 ## Separación del botón de ataque respecto al borde del stick (mano derecha).
 const ATTACK_GAP: float = 80.0
-const ATTACK_LIFT: float = 40.0
+const ATTACK_LIFT: float = 0.0  # centrado con el stick (pedido de Caleb)
 ## Espacio plano entre el cuadrado de ataque y la media luna de la piedra.
 const STONE_GAP: float = 14.0
 

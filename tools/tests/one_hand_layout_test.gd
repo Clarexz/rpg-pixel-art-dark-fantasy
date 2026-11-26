@@ -89,7 +89,7 @@ func _run() -> void:
 	_touch(0, p, false)
 	await _frames(2)
 	var anchor: Vector2 = _one._anchor
-	_check(absf(_attack.hit_center().x - (anchor.x + r + 80.0)) <= 1.0, "zurdo: ataque no está a R+80 a la derecha (x=%.1f, ancla=%.1f)" % [_attack.hit_center().x, anchor.x])
+	_check(absf(_attack.hit_center().x - (anchor.x + r + OneHandControls.ATTACK_GAP)) <= 1.0, "zurdo: ataque no está a R+80 a la derecha (x=%.1f, ancla=%.1f)" % [_attack.hit_center().x, anchor.x])
 	_check(absf(_stone.hit_center().x - _attack.hit_center().x) <= 1.0, "zurdo: la piedra no está sobre el ataque")
 	_check_inside(rect, r, "zurdo")
 	_one.settings.left_handed = false
@@ -97,13 +97,13 @@ func _run() -> void:
 	await _frames(3)
 
 
-## Comprueba que el ataque esté a R+80 a la izquierda del stick y a 40 px arriba.
+## Comprueba que el ataque esté a R+ATTACK_GAP a la izquierda del stick y ATTACK_LIFT px arriba.
 func _check_cluster(p: Vector2, r: float, when: String) -> void:
 	var anchor: Vector2 = _one._anchor
 	_check(anchor.distance_to(p) <= 1.0, "%s: el ancla no está en el toque (%s vs %s)" % [when, anchor, p])
 	var a: Vector2 = _attack.hit_center()
-	_check(absf(a.x - (anchor.x - r - 80.0)) <= 1.0, "%s: ataque no está a R+80 a la izquierda (x=%.1f)" % [when, a.x])
-	_check(absf(a.y - (anchor.y - 40.0)) <= 1.0, "%s: ataque no está 40 px arriba del centro (y=%.1f)" % [when, a.y])
+	_check(absf(a.x - (anchor.x - r - OneHandControls.ATTACK_GAP)) <= 1.0, "%s: ataque no está a R+80 a la izquierda (x=%.1f)" % [when, a.x])
+	_check(absf(a.y - (anchor.y - OneHandControls.ATTACK_LIFT)) <= 1.0, "%s: ataque no está 40 px arriba del centro (y=%.1f)" % [when, a.y])
 	_check(absf(_stone.hit_center().x - a.x) <= 1.0, "%s: la piedra no está centrada sobre el ataque" % when)
 
 
