@@ -17,6 +17,8 @@ func _ready() -> void:
 	RivalRegistry.save_enabled = false
 	Piedra.save_enabled = false
 	_world = WORLD.instantiate() as World
+	# Estas pruebas usan el campo de pruebas (nivel gris).
+	_world.start_zone = load(World.PRACTICE_ZONE)
 	add_child(_world)
 	_player = _world.get_node("Player")
 	_touch = _world.get_node("HUD/SafeArea/TouchControls")

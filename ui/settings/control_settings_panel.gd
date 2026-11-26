@@ -7,6 +7,8 @@ extends PanelContainer
 ## escena. Analogía web: hacer `ROWS.map(row => <Slider {...row} />)`.
 
 signal closed
+## Pide cambiar entre la zona principal y el campo de pruebas.
+signal zone_switch_requested
 
 ## [propiedad del Resource, texto, mínimo, máximo, paso]. Sin mínimo = checkbox.
 ## [propiedad, texto, [opciones]] = lista desplegable.
@@ -27,6 +29,8 @@ const ROWS: Array = [
 ]
 
 var settings: ControlSettings
+## Id de la zona cargada (lo pone World al abrir el panel).
+var current_zone: StringName = &""
 
 @onready var _rows: VBoxContainer = %Rows
 @onready var _close_button: Button = %CloseButton
@@ -62,6 +66,7 @@ func _reset() -> void:
 
 func _build_rows() -> void:
 	for child: Node in _rows.get_children():
+		_rows.remove_child(child)  # fuera ya, para que los nombres no choquen
 		child.queue_free()
 	for row: Array in ROWS:
 		var prop: String = row[0]
@@ -101,7 +106,25 @@ func _build_rows() -> void:
 			# int para las propiedades enteras (haptic_ms), float para el resto.
 			settings.set(prop, int(value) if typeof(settings.get(prop)) == TYPE_INT else value)
 			update_title.call(value))
+	_build_zone_rows()
 	_build_graphics_rows()
+
+
+## Sección "Zona": ir al campo de pruebas (nivel gris) y volver.
+func _build_zone_rows() -> void:
+	var header: Label = Label.new()
+	header.text = "— Zona —"
+	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_rows.add_child(header)
+	var go: Button = Button.new()
+	go.name = "ZoneSwitchButton"
+	go.text = "Volver a la Hondonada de ceniza" if current_zone == &"greybox" \
+			else "Ir al campo de pruebas (nivel gris)"
+	go.custom_minimum_size.y = 80
+	go.pressed.connect(func() -> void:
+		close()
+		zone_switch_requested.emit())
+	_rows.add_child(go)
 
 
 ## Sección "Gráficos y rendimiento". Estos ajustes viven en el autoload

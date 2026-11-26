@@ -23,6 +23,8 @@ func _ready() -> void:
 	Piedra.use_record(PlayerRecord.new())
 	Inventory.save_enabled = false
 	_world = WORLD.instantiate() as World
+	# Estas pruebas usan el campo de pruebas (nivel gris).
+	_world.start_zone = load(World.PRACTICE_ZONE)
 	add_child(_world)
 	_player = _world.get_node("Player")
 	_one = _world.get_node("HUD/SafeArea/OneHandControls")

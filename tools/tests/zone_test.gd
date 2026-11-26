@@ -6,7 +6,11 @@ extends Node
 ## 5) (v0.6.2) con mapa de navegación, un enemigo rodea una pared para
 ##    alcanzarte, y ese duelo se registra con el id de esa zona,
 ## 6) no se puede cambiar de zona a media pelea,
-## 7) (v0.6.2) el kit de bloques existe y el nivel gris tiene su ruina y navegación.
+## 7) (v0.6.2) el kit de bloques existe y el nivel gris tiene su ruina y navegación,
+## 8) (v0.6.3) sin zona elegida, el juego empieza en la Hondonada de ceniza,
+##    con sus 6 enemigos comunes y el Lobo; desde el inicio se puede llegar
+##    caminando a cada enemigo y a la meseta del altar,
+## 9) (v0.6.3) Ajustes lleva al campo de pruebas y de regreso.
 ## Corre en CI con: godot --headless --path . res://tools/tests/zone_test.tscn
 
 const WORLD: PackedScene = preload("res://world/world.tscn")
@@ -24,6 +28,8 @@ func _ready() -> void:
 	Inventory.save_enabled = false
 	Piedra.use_record(PlayerRecord.new())
 	_world = WORLD.instantiate() as World
+	# Estas pruebas usan el campo de pruebas (nivel gris).
+	_world.start_zone = load(World.PRACTICE_ZONE)
 	add_child(_world)
 	await _frames(5)
 	(_world.get_node("Player") as Player).settings.haptics_enabled = false
@@ -107,6 +113,75 @@ func _run() -> void:
 	if grey.get_node_or_null("Level/Ruina") is GridMap:
 		_check((grey.get_node("Level/Ruina") as GridMap).get_used_cells().size() > 10, "la ruina está vacía")
 	grey.free()
+
+	await _test_hondonada()
+
+
+func _test_hondonada() -> void:
+	print("Paso 8: la Hondonada de ceniza")
+	_world.queue_free()
+	await _frames(2)
+	var world: World = WORLD.instantiate() as World
+	add_child(world)
+	_world = world
+	_check(world.zone != null and world.zone.zone_id() == &"hondonada", "el juego no empezó en la Hondonada")
+	if world.zone == null:
+		return
+	var t0: int = Time.get_ticks_msec()
+	if not world.zone.navigation_baked:
+		await world.zone.navigation_ready
+	print("  mapa de navegación calculado en %d ms" % (Time.get_ticks_msec() - t0))
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var player: Player = world.get_node("Player")
+	var start: Vector3 = (world.zone.get_node("PlayerStart") as Node3D).global_position
+	_check(player.global_position.distance_to(start) < 0.5, "no empezaste en el campamento")
+	var counts: Dictionary = {}
+	for e: Enemy in world.zone.enemies():
+		counts[e.data.id] = int(counts.get(e.data.id, 0)) + 1
+	_check(int(counts.get(&"scavenger", 0)) == 4, "debería haber 4 Carroñeros (%s)" % counts)
+	_check(int(counts.get(&"slag_golem", 0)) == 2, "debería haber 2 Gólems (%s)" % counts)
+	_check(int(counts.get(&"ash_wolf", 0)) == 1, "debería estar el Lobo de ceniza (%s)" % counts)
+	var map: RID = world.get_world_3d().navigation_map
+	var from: Vector3 = NavigationServer3D.map_get_closest_point(map, start)
+	for e: Enemy in world.zone.enemies():
+		var path: PackedVector3Array = NavigationServer3D.map_get_path(map, from, e.global_position, true)
+		var end_ok: bool = not path.is_empty() and _flat(path[path.size() - 1]).distance_to(_flat(e.global_position)) < 1.5
+		_check(end_ok, "no hay camino caminando hasta %s en %s" % [e.name, e.global_position])
+	# Meseta del altar: centro del lugar del altar, a 1 m de alto.
+	var altar: Vector3 = Vector3(1, 1, -39)
+	var to_altar: PackedVector3Array = NavigationServer3D.map_get_path(map, from, altar, true)
+	_check(not to_altar.is_empty() and to_altar[to_altar.size() - 1].y > 0.6
+			and _flat(to_altar[to_altar.size() - 1]).distance_to(_flat(altar)) < 3.0,
+			"no se puede subir a la meseta del altar")
+	var length: float = 0.0
+	for i: int in range(1, to_altar.size()):
+		length += to_altar[i - 1].distance_to(to_altar[i])
+	print("  del campamento al altar: %.0f m (≈%.0f s caminando)" % [length, length / player.walk_speed])
+
+	print("Paso 9: Ajustes lleva al campo de pruebas y de regreso")
+	var panel: ControlSettingsPanel = world.get_node("HUD/SettingsPanel")
+	world._open_settings()
+	await _frames(2)
+	var button: Button = panel.find_child("ZoneSwitchButton", true, false) as Button
+	_check(button != null and "pruebas" in button.text, "no está el botón para ir al campo de pruebas")
+	if button:
+		button.pressed.emit()
+	await _frames(3)
+	_check(world.zone.zone_id() == &"greybox", "no se cambió al campo de pruebas")
+	_check(not get_tree().paused, "el juego quedó en pausa al cambiar de zona")
+	world._open_settings()
+	await _frames(2)
+	button = panel.find_child("ZoneSwitchButton", true, false) as Button
+	_check(button != null and "Hondonada" in button.text, "no está el botón para volver a la Hondonada")
+	if button:
+		button.pressed.emit()
+	await _frames(3)
+	_check(world.zone.zone_id() == &"hondonada", "no se volvió a la Hondonada")
+
+
+func _flat(v: Vector3) -> Vector3:
+	return Vector3(v.x, 0.0, v.z)
 
 
 func _frames(n: int) -> void:

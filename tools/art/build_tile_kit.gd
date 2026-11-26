@@ -28,6 +28,7 @@ const BLOCKS: Array = [
 	[7, "rampa_baja", "ceniza", "ramp_low"],
 	[8, "rampa_alta", "ceniza", "ramp_high"],
 	[9, "muro_bajo_ladrillo", "ladrillo", "half"],
+	[10, "tronco_quemado", "madera", "trunk"],
 ]
 
 
@@ -85,6 +86,8 @@ func _shape_points(shape: String) -> PackedVector3Array:
 			return _box(Vector3(-1, -1, -1), Vector3(1, 0, 1))
 		"crate":
 			return _box(Vector3(-0.8, -1, -0.6), Vector3(0.8, 0.0, 0.6))
+		"trunk":  # tronco delgado; se apilan dos para un árbol de 4 m
+			return _box(Vector3(-0.35, -1, -0.35), Vector3(0.35, 1, 0.35))
 		"ramp_low":  # de 0 a 1 m de alto
 			return PackedVector3Array([
 				Vector3(-1, -1, 1), Vector3(1, -1, 1), Vector3(-1, -1, -1), Vector3(1, -1, -1),

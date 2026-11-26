@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="ZoneData" format=3]
+
+[ext_resource type="Script" path="res://world/zones/zone_data.gd" id="1_zd"]
+
+[resource]
+script = ExtResource("1_zd")
+id = &"hondonada"
+display_name = "Hondonada de ceniza"

@@ -8,7 +8,12 @@ extends Node3D
 ## Duel ("call down, signal up").
 ## Analogía web: el layout fijo de la app; la zona es la página que cambia.
 
-## Zona con la que empieza el juego.
+## La zona principal del juego y el campo de pruebas (el nivel gris, que
+## además usan las pruebas automáticas). Se cambia entre ellas en Ajustes.
+const MAIN_ZONE: String = "res://world/zones/hondonada/hondonada.tscn"
+const PRACTICE_ZONE: String = "res://world/zones/greybox/greybox.tscn"
+
+## Zona con la que empieza el juego (si se deja vacío, la principal).
 @export var start_zone: PackedScene
 
 ## La zona cargada ahora mismo.
@@ -62,8 +67,8 @@ func _ready() -> void:
 	_panel.closed.connect(_on_settings_closed)
 	_duel.finished.connect(_on_duel_finished)
 	_duel.memory_saved.connect(func(_m: RivalMemory) -> void: _rivals.save())
-	if start_zone:
-		load_zone(start_zone)
+	_panel.zone_switch_requested.connect(_on_zone_switch_requested)
+	load_zone(start_zone if start_zone else load(MAIN_ZONE) as PackedScene)
 	apply_mode()
 
 
@@ -199,11 +204,18 @@ func _on_player_scanned(target: Node3D) -> void:
 
 
 func _open_settings() -> void:
+	_panel.current_zone = zone.zone_id() if zone else &""
 	_touch.release_all()
 	_one_hand.release_all()
 	_touch.hide()
 	_one_hand.hide()
 	_panel.open()
+
+
+## Ajustes > "Ir al campo de pruebas" / "Volver a la Hondonada".
+func _on_zone_switch_requested() -> void:
+	var to_practice: bool = zone == null or zone.zone_id() != &"greybox"
+	load_zone(load(PRACTICE_ZONE if to_practice else MAIN_ZONE) as PackedScene)
 
 
 func _on_settings_closed() -> void:
