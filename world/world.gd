@@ -1,10 +1,18 @@
+class_name World
 extends Node3D
-## Escena principal: nivel gris para probar controles y el combate.
+## Escena principal: lo que SIEMPRE está (jugador, HUD, duelo, transición)
+## más una ranura (`ZoneSlot`) donde se carga UNA zona a la vez.
 ##
 ## Este script es el "padre" que conecta a los hijos entre sí: escucha las
 ## señales de los controles y de los enemigos y llama métodos de Player y
 ## Duel ("call down, signal up").
-## Analogía web: el componente contenedor que pasa callbacks entre hermanos.
+## Analogía web: el layout fijo de la app; la zona es la página que cambia.
+
+## Zona con la que empieza el juego.
+@export var start_zone: PackedScene
+
+## La zona cargada ahora mismo.
+var zone: Zone
 
 var _settings: ControlSettings
 ## La memoria de cada rival, guardada por id.
@@ -13,6 +21,7 @@ var _rivals: RivalRegistry
 var _inventory: Inventory
 var _stone_timer: float = 0.0
 
+@onready var _zone_slot: Node3D = $ZoneSlot
 @onready var _player: Player = $Player
 @onready var _touch: TouchControls = $HUD/SafeArea/TouchControls
 @onready var _one_hand: OneHandControls = $HUD/SafeArea/OneHandControls
@@ -53,9 +62,30 @@ func _ready() -> void:
 	_panel.closed.connect(_on_settings_closed)
 	_duel.finished.connect(_on_duel_finished)
 	_duel.memory_saved.connect(func(_m: RivalMemory) -> void: _rivals.save())
-	for enemy: Node in get_tree().get_nodes_in_group("enemy"):
-		(enemy as Enemy).engaged.connect(_on_enemy_engaged)
+	if start_zone:
+		load_zone(start_zone)
 	apply_mode()
+
+
+## Cambia la zona: quita la anterior, monta la nueva y pone al jugador en su
+## inicio. Hoy hay una sola zona a la vez; aquí entrará el streaming después.
+func load_zone(scene: PackedScene) -> Zone:
+	if _duel.is_active():
+		push_warning("No se cambia de zona durante un duelo")
+		return zone
+	if zone:
+		_zone_slot.remove_child(zone)
+		zone.queue_free()
+	zone = scene.instantiate() as Zone
+	assert(zone != null, "La escena de zona debe usar world/zones/zone.gd")
+	zone.name = "Zone"
+	_zone_slot.add_child(zone)
+	for enemy: Enemy in zone.enemies():
+		enemy.engaged.connect(_on_enemy_engaged)
+	_duel.zone_id = zone.zone_id()
+	_player.global_transform = zone.player_start()
+	_player.velocity = Vector3.ZERO
+	return zone
 
 
 ## Muestra los controles del modo elegido en Ajustes (una mano o dos pulgares).
@@ -86,9 +116,9 @@ func _process(delta: float) -> void:
 ## La piedra vibra cuando hay un enemigo cerca: más seguido entre más cerca.
 func _update_stone(delta: float) -> void:
 	var closeness: float = 0.0
-	if not _duel.is_active():
-		for enemy: Node in get_tree().get_nodes_in_group("enemy"):
-			closeness = maxf(closeness, (enemy as Enemy).closeness_to(_player.global_position))
+	if not _duel.is_active() and zone:
+		for enemy: Enemy in zone.enemies():
+			closeness = maxf(closeness, enemy.closeness_to(_player.global_position))
 	_stone_label.visible = closeness > 0.0
 	if closeness <= 0.0:
 		_stone_timer = 0.0

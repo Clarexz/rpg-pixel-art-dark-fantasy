@@ -93,6 +93,8 @@ var _inventory: Inventory
 var _tactics: RivalTactics
 ## Lo que va pasando en este duelo; al final se entrega a la memoria.
 var _encounter: Encounter
+## Id de la zona donde se pelea (lo pone World al cargar la zona).
+var zone_id: StringName = &"greybox"
 var _transition: PixelateTransition
 var _reading: PowerReading
 var _step: int = 0
@@ -128,6 +130,7 @@ func start(player: Player, enemy: Enemy, advantage: StringName, settings: Contro
 	_reading = Piedra.scan(enemy.data, _memory)
 	_encounter = Encounter.new()
 	_encounter.rival_id = enemy.data.id
+	_encounter.zone = zone_id
 	_encounter.is_rival = _memory != null
 	_encounter.advantage = advantage
 	hp = PLAYER_MAX_HP

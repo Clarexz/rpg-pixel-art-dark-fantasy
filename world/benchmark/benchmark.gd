@@ -10,7 +10,7 @@ extends Node3D
 ## Analogía web: un Lighthouse que corre dentro del juego.
 
 const GHOUL: PackedScene = preload("res://world/benchmark/ghoul.tscn")
-const GREYBOX: String = "res://world/greybox/greybox.tscn"
+const WORLD: String = "res://world/world.tscn"
 const SAFE_AREA: Script = preload("res://ui/safe_area/safe_area_container.gd")
 const OVERLAY: Script = preload("res://ui/hud/debug_overlay.gd")
 
@@ -367,4 +367,4 @@ func _back_to_game() -> void:
 	_cancelled = true
 	_sampling = false
 	_restore()
-	get_tree().change_scene_to_file(GREYBOX)
+	get_tree().change_scene_to_file(WORLD)

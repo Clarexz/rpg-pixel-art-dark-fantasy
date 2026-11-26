@@ -7,13 +7,13 @@ extends Node
 ## fuerte, 8) lobo: la finta cambia de lado y se puede bloquear perfecto.
 ## Corre en CI con: godot --headless --path . res://tools/tests/combat_test.tscn
 
-const GREYBOX: PackedScene = preload("res://world/greybox/greybox.tscn")
+const WORLD: PackedScene = preload("res://world/world.tscn")
 const SCAV: EnemyData = preload("res://enemies/data/scavenger.tres")
 const GOLEM: EnemyData = preload("res://enemies/data/slag_golem.tres")
 const WOLF: RivalData = preload("res://rivals/data/ash_wolf.tres")
 
 var _failures: PackedStringArray = []
-var _world: Node3D
+var _world: World
 var _player: Player
 var _duel: Duel
 var _ui: DuelUI
@@ -28,7 +28,7 @@ func _ready() -> void:
 	test_patterns()
 	test_inventory()
 	test_flee_chance()
-	_world = GREYBOX.instantiate()
+	_world = WORLD.instantiate() as World
 	add_child(_world)
 	_player = _world.get_node("Player")
 	_duel = _world.get_node("Duel")
@@ -120,7 +120,7 @@ func test_flee_chance() -> void:
 
 func test_chase_and_ambush() -> void:
 	print("Paso 5: te ve, te persigue y te alcanza")
-	var scav: Enemy = _world.get_node("Enemies/Scavenger")
+	var scav: Enemy = _world.zone.get_node("Enemies/Scavenger")
 	scav.global_position = Vector3(8, 0, -6)
 	_player.global_position = Vector3(3, 0, -6)
 	_player.face_direction(Vector3(0, 0, 1))  # de espaldas: no le pega primero
@@ -135,7 +135,7 @@ func test_chase_and_ambush() -> void:
 
 func test_common_enemy_duel() -> void:
 	print("Paso 6: duelo contra un enemigo común")
-	var scav: Enemy = _world.get_node("Enemies/Scavenger")
+	var scav: Enemy = _world.zone.get_node("Enemies/Scavenger")
 	var inv: Inventory = _world.get("_inventory")
 	var registry: RivalRegistry = _world.get("_rivals")
 	# Empieza él (emboscada): recibir su golpe.
@@ -166,7 +166,7 @@ func test_common_enemy_duel() -> void:
 
 func test_golem_charge() -> void:
 	print("Paso 7: gólem: carga, Trueno la corta; si no, pega fuerte")
-	var golem: Enemy = _world.get_node("Enemies/SlagGolem")
+	var golem: Enemy = _world.zone.get_node("Enemies/SlagGolem")
 	_player.global_position = golem.global_position + Vector3(0, 0, 2.0)
 	_world._on_enemy_engaged(golem, &"player")
 	await _until(func() -> bool: return _duel.phase == &"menu", 5.0)
@@ -195,7 +195,7 @@ func test_golem_charge() -> void:
 
 func test_wolf_feint() -> void:
 	print("Paso 8: lobo: la finta cambia de lado")
-	var wolf: Enemy = _world.get_node("Enemies/AshWolf")
+	var wolf: Enemy = _world.zone.get_node("Enemies/AshWolf")
 	_player.global_position = wolf.global_position + Vector3(0, 0, 2.0)
 	_world._on_enemy_engaged(wolf, &"player")
 	await _until(func() -> bool: return _duel.phase == &"menu", 5.0)
