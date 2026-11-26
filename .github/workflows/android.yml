@@ -94,6 +94,9 @@ jobs:
       - name: Prueba del duelo a una mano (dedos simulados)
         run: $GODOT --headless --path . res://tools/tests/duel_test.tscn
 
+      - name: Prueba del pipeline pixel art y del benchmark
+        run: $GODOT --headless --path . res://tools/tests/pixel_test.tscn
+
       - name: Versión
         id: version
         run: tools/ci/version.sh | tee -a "$GITHUB_OUTPUT"

@@ -4,6 +4,8 @@ RPG de mundo abierto en primera persona para celular **en vertical**, con estét
 
 Estado: **v0.2.0, prototipo a una mano**. Exploración en primera persona con un solo pulgar (libre o por casillas) y un duelo por turnos contra un cubo de prueba que te recuerda. Ver [`docs/prototipo-una-mano.md`](docs/prototipo-una-mano.md). La fase 1 (dos pulgares) sigue disponible en Ajustes: [`docs/fase-1-controles.md`](docs/fase-1-controles.md).
 
+**v0.3.0, pipeline pixel art:** el mundo 3D se dibuja a baja resolución y se estira nítido; enemigos como sprites billboard; monitor de rendimiento y prueba de estrés en Ajustes. Ver [`docs/pipeline-pixel-art.md`](docs/pipeline-pixel-art.md).
+
 ## Descargar y probar en tu Android
 
 1. Desde el celular, entra a la pestaña **Releases** del repo y descarga el `.apk` más reciente.

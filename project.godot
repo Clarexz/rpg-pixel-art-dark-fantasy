@@ -12,13 +12,15 @@ config_version=5
 
 config/name="RPG Pixel Art Dark Fantasy"
 config/description="RPG de mundo abierto en primera persona, vertical, pixel art."
-config/version="0.2.0"
+config/version="0.3.0"
 run/main_scene="res://world/greybox/greybox.tscn"
 config/features=PackedStringArray("4.7", "Mobile")
 config/icon="res://icon.svg"
+config/project_settings_override="user://renderer_override.cfg"
 
 [autoload]
 
+Graphics="*res://core/graphics/graphics.gd"
 Sfx="*res://core/sfx.gd"
 
 [debug]
