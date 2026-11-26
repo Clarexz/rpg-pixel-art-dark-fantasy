@@ -88,6 +88,9 @@ jobs:
       - name: Smoke test (el juego arranca sin errores)
         run: tools/ci/smoke_test.sh
 
+      - name: Prueba de controles (dedos simulados)
+        run: $GODOT --headless --path . res://tools/tests/controls_test.tscn
+
       - name: Versión
         id: version
         run: tools/ci/version.sh | tee -a "$GITHUB_OUTPUT"

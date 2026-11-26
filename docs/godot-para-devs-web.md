@@ -43,6 +43,18 @@ Configurado en `project.godot`:
 - **Safe area**: `ui/safe_area/safe_area_container.gd` mete la UI dentro de la zona segura (lejos del notch y de la barra de gestos). Es el `env(safe-area-inset-*)` de CSS. Toda la UI va dentro de un `SafeAreaContainer`.
 - **Modo inmersivo** activado en el export de Android (oculta las barras del sistema).
 
+## Input táctil (fase 1)
+
+| Godot | Web | Nota |
+|---|---|---|
+| `InputEventScreenTouch` | `pointerdown` / `pointerup` | Trae `index` (qué dedo), como `pointerId`. |
+| `InputEventScreenDrag` | `pointermove` | `relative` = cuánto se movió desde el evento anterior (`movementX/Y`). |
+| `_input()` vs `_unhandled_input()` | listener en fase de captura vs. en `document` | `TouchControls` usa `_input` para ver todos los dedos antes que la UI. |
+| `Button` de Godot | `<button>` | Solo reacciona al primer dedo, por eso los botones de acción (`ActionButton`) los maneja `TouchControls` a mano. |
+| `Input.vibrate_handheld(ms)` | `navigator.vibrate(ms)` | Necesita el permiso VIBRATE en el export de Android (ya está). |
+| `Tween` | `element.animate()` / Framer Motion | Animaciones cortas por código (el swing del arma, el muñeco que se sacude). |
+| `get_tree().paused = true` | — | Congela todo salvo nodos con `process_mode = ALWAYS` (el panel de ajustes). |
+
 ## Renderer
 
 `Mobile` (Vulkan), con fallback automático a OpenGL ES 3 en celulares sin buen soporte de Vulkan. Se revalúa contra `Compatibility` en la fase 2 (pipeline pixel art).
