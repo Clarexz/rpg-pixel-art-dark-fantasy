@@ -1,13 +1,16 @@
 # Construye el APK de Android con Godot en modo headless (sin ventana).
 #
-# - Pull request  -> smoke test + APK de prueba como "artifact" del run (no se publica).
-# - Push a main   -> smoke test + APK firmado + GitHub Release "vX.Y.Z"
+# - Pull request  -> pruebas + APK como "artifact" del run (no se publica).
+# - Push a main   -> pruebas + APK firmado + release OFICIAL "vX.Y.Z"
 #                    (solo si esa versión todavía no tiene release).
-# - Manual        -> pestaña Actions > Android build > Run workflow
-#                    (en main publica release; en otra rama solo deja el artifact).
+# - Manual (Actions > Android build > Run workflow):
+#     * en main: igual que el push (publica si falta el release oficial).
+#     * en una rama de área (mecanicas, mundo, lore, enemigos, sprites, ui-ux):
+#       publica un BUILD DE PRUEBA como pre-release "vX.Y.Z-<area>.N".
+#     * en cualquier otra rama: solo deja el artifact.
 #
-# La versión sale de project.godot (application/config/version). Para publicar
-# un release nuevo, se sube esa versión en el PR.
+# La versión sale de project.godot (application/config/version). Ver
+# docs/flujo-de-releases.md para el esquema completo.
 name: Android build
 
 on:
@@ -106,13 +109,50 @@ jobs:
       - name: Prueba de mundo y zonas (cargar y cambiar de zona)
         run: timeout 300 $GODOT --headless --path . res://tools/tests/zone_test.tscn
 
+      - name: ¿Qué se publica? (oficial, build de prueba o nada)
+        id: mode
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          BASE=$(sed -n 's/^config\/version="\(.*\)"$/\1/p' project.godot)
+          AREAS=" mecanicas mundo lore enemigos sprites ui-ux "
+          if [ "$GITHUB_REF" = "refs/heads/main" ] && [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
+            echo "mode=oficial" >> "$GITHUB_OUTPUT"
+          elif [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [[ "$AREAS" == *" $REF_NAME "* ]]; then
+            if gh release view "v$BASE" > /dev/null 2>&1; then
+              echo "::error::v$BASE ya salió como release oficial. Sube config/version en project.godot (por ejemplo a la siguiente 0.X.0) antes de publicar builds de prueba."
+              exit 1
+            fi
+            # N = cuenta dentro del área (enemigos.1, .2...). S = cuenta de todas las áreas de
+            # esta versión, para el versionCode (cada build se instala encima del anterior).
+            TAGS=$(gh release list --limit 300 --json tagName --jq '.[].tagName' | grep -E "^v${BASE//./\\.}-[a-z-]+\.[0-9]+$" || true)
+            N=$(( $(printf "%s\n" "$TAGS" | grep -c "^v${BASE}-${REF_NAME}\." || true) + 1 ))
+            S=$(( $(printf "%s\n" "$TAGS" | grep -c . || true) + 1 ))
+            echo "mode=prueba" >> "$GITHUB_OUTPUT"
+            echo "area=$REF_NAME" >> "$GITHUB_OUTPUT"
+            echo "n=$N" >> "$GITHUB_OUTPUT"
+            echo "s=$S" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=artifact" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Versión
         id: version
-        run: tools/ci/version.sh | tee -a "$GITHUB_OUTPUT"
+        run: tools/ci/version.sh ${{ steps.mode.outputs.area }} ${{ steps.mode.outputs.n }} ${{ steps.mode.outputs.s }} | tee -a "$GITHUB_OUTPUT"
+
+      # Una sola vez: pasa los releases del prototipo (v0.0.1 a v0.6.3) a proto-vX.Y.Z.
+      # Es idempotente; se puede quitar cuando ya corrió.
+      - name: Archivar releases del prototipo
+        if: steps.mode.outputs.mode == 'oficial'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: tools/ci/archivar-prototipos.sh
 
       - name: ¿Ya existe el release?
         id: release-check
-        if: github.ref == 'refs/heads/main'
+        if: steps.mode.outputs.mode == 'oficial'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -167,18 +207,41 @@ jobs:
           path: ${{ steps.export.outputs.apk }}
           retention-days: 14
 
-      - name: Publicar GitHub Release
-        if: github.ref == 'refs/heads/main' && steps.release-check.outputs.exists == 'false'
+      - name: Publicar release oficial
+        if: steps.mode.outputs.mode == 'oficial' && steps.release-check.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           TAG="v${{ steps.version.outputs.version }}"
-          FLAGS="--generate-notes --target ${{ github.sha }}"
+          FLAGS="--target ${{ github.sha }}"
           NOTES="APK para Android (arm64). Descárgalo desde el celular y ábrelo para instalar."
           if [ "${{ steps.keystore.outputs.has_keystore }}" != "true" ]; then
             FLAGS="$FLAGS --prerelease"
             NOTES="$NOTES\n\n> Firmado con llave de debug temporal: desinstala la versión anterior antes de instalar esta."
+          else
+            FLAGS="$FLAGS --latest"
           fi
-          gh release create "$TAG" "${{ steps.export.outputs.apk }}" \
-            --title "$TAG" --notes "$(printf "$NOTES")" $FLAGS
+          # Notas agrupadas por área: docs/notas/vX.Y.Z.md (si existe). Si no, las genera GitHub.
+          printf "%b\n\n" "$NOTES" > "$RUNNER_TEMP/notes.md"
+          if [ -f "docs/notas/$TAG.md" ]; then
+            cat "docs/notas/$TAG.md" >> "$RUNNER_TEMP/notes.md"
+          else
+            FLAGS="$FLAGS --generate-notes"
+          fi
+          gh release create "$TAG" "${{ steps.export.outputs.apk }}" --title "$TAG" \
+            --notes-file "$RUNNER_TEMP/notes.md" $FLAGS
+
+      - name: Publicar build de prueba (pre-release)
+        if: steps.mode.outputs.mode == 'prueba'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="v${{ steps.version.outputs.version }}"
+          printf "%s\n\n%s\n%s\n" \
+            "Build de prueba del área **${{ steps.mode.outputs.area }}** (rama \`${{ github.ref_name }}\`). No es una versión oficial del juego." \
+            "APK para Android (arm64). Se instala encima del release oficial anterior." \
+            "Commit: ${{ github.sha }}" > "$RUNNER_TEMP/notes.md"
+          gh release create "$TAG" "${{ steps.export.outputs.apk }}" --title "$TAG" \
+            --prerelease --latest=false --target ${{ github.sha }} --notes-file "$RUNNER_TEMP/notes.md"

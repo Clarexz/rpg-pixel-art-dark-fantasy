@@ -2,25 +2,63 @@
 
 Es el mismo flujo que usarías con una app Android nativa. Godot exporta APKs desde la línea de comandos (modo `--headless`, sin ventana), así que corre perfecto en GitHub Actions.
 
+## Dos tipos de versión
+
+El juego avanza en 6 áreas a la vez (mecánicas, mundo, lore, enemigos, sprites, UI/UX), cada una en su rama. Para no gastar un número de versión por cada mejora chica, hay dos tipos de release:
+
+| Tipo | Ejemplo | Sale de | Para qué |
+|---|---|---|---|
+| **Build de prueba** (pre-release) | `v0.2.0-enemigos.3` | la rama del área | Que Caleb pruebe en el celular una mejora de un área. No es una versión del juego. |
+| **Release oficial** | `v0.2.0`, `v0.2.1` | `main` | Junta las mejoras de varias áreas ya integradas. |
+
+Reglas de los números oficiales (`0.X.Y`):
+- **0.X.0** cuando hay un avance notable (un hito: "combate pulido", "primera zona con lore").
+- **0.X.Y** para arreglos y ajustes chicos sobre esa versión.
+
+En un build de prueba, `0.X.Y` es la versión oficial **a la que va** esa mejora, `<area>` es la rama y `N` cuenta los builds de prueba de esa área para esa versión.
+
+**Ejemplo de una iteración.** v0.1.0 es la base reiniciada, así que la primera iteración de los hilos apunta a **0.2.0**:
+
+```
+v0.2.0-enemigos.1, v0.2.0-enemigos.2, v0.2.0-enemigos.3     (pruebas del hilo de enemigos)
+v0.2.0-mecanicas.1 ... v0.2.0-mecanicas.5                   (pruebas del hilo de mecánicas)
+... Caleb dice "esto basta para esta iteración" ...
+todo se junta en main  ->  sale el release oficial v0.2.0
+```
+
+La siguiente iteración usa `v0.3.0-<area>.N`, y así. Un arreglo chico sobre una oficial ya publicada sale como `0.2.1`.
+
+Los releases del prototipo (v0.0.1 a v0.6.3, antes de este esquema) quedaron archivados como `proto-v0.x.y (Prototipo)`. La serie nueva arrancó en **v0.1.0**.
+
 ## Qué pasa en cada evento
 
 | Evento | Qué hace el workflow `Android build` |
 |---|---|
-| Pull request | Importa assets, corre el smoke test, exporta APK y lo deja como **artifact** del run (14 días). No publica nada. |
-| Push / merge a `main` | Lo mismo, y si la versión de `project.godot` no tiene release todavía, crea el **GitHub Release `vX.Y.Z`** con el APK. |
-| Manual (Actions > Android build > Run workflow) | En `main` publica. En otra rama solo deja el artifact. |
+| Pull request | Importa assets, corre las pruebas, exporta APK y lo deja como **artifact** del run (14 días). No publica nada. |
+| Push / merge a `main` | Lo mismo, y si la versión de `project.godot` no tiene release todavía, crea el **release oficial `vX.Y.Z`** con el APK. |
+| Manual en `main` (Actions > Android build > Run workflow) | Igual que el push a `main`. |
+| Manual en una rama de área | Publica un **build de prueba** `vX.Y.Z-<area>.N` como pre-release. Falla si `vX.Y.Z` ya salió como oficial: primero hay que subir la versión. |
+| Manual en otra rama | Solo deja el artifact. |
 
 El **smoke test** corre el juego sin ventana 300 frames y falla si Godot imprime errores de script o de carga. Es el equivalente a "¿al menos compila y arranca?".
 
+### Cómo trabaja un hilo de área
+1. En su rama, pone `config/version` en `project.godot` en la versión oficial de la iteración actual (por ejemplo `0.2.0` mientras la última oficial sea `0.1.x`).
+2. Cuando tiene algo para probar, corre el workflow a mano en su rama (Claude lo hace con la API de GitHub Actions). Sale `v0.2.0-<area>.N`.
+3. Cuando el área queda lista, abre PR a `main`. Si va a salir release oficial, el PR que sube la versión agrega `docs/notas/vX.Y.Z.md` con las notas agrupadas por área (### Mecánicas, ### Enemigos, ### UI/UX...). Si no existe ese archivo, GitHub genera las notas con la lista de PRs.
+
 ## Versiones
 
-La única fuente de verdad es `application/config/version` en `project.godot` (formato `X.Y.Z`). El script `tools/ci/version.sh` la copia al preset de Android y calcula el `versionCode` que exige Android:
+La única fuente de verdad es `application/config/version` en `project.godot` (formato `X.Y.Z`). El script `tools/ci/version.sh` la copia al preset de Android y calcula el `versionCode` (el número interno que Android compara para saber si algo es "más nuevo"):
 
 ```
-versionCode = X*10000 + Y*100 + Z      0.3.1 -> 301
+versionCode = (X*10000 + Y*100 + Z) * 1000 + S
+  S = cuenta de TODOS los builds de prueba de esa versión (cualquier área), de 1 a 998
+  build de prueba  0.2.0-mecanicas.1 (el 4.º build de prueba de 0.2.0)  ->  200004
+  release oficial  0.2.0  (S = 999)                                      ->  200999
 ```
 
-Android solo instala una actualización encima de otra si el `versionCode` sube **y** está firmada con la misma llave.
+Así cada build de prueba se instala encima del anterior aunque sea de otra área, y el oficial 0.2.0 se instala encima de todos sus builds de prueba. Android solo instala una actualización encima de otra si el `versionCode` sube **y** está firmada con la misma llave.
 
 ## La llave de firma (esto lo haces tú, una sola vez)
 
