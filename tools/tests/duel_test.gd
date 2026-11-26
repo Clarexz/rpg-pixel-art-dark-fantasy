@@ -6,10 +6,10 @@ extends Node
 ## 6) hechizo con su canción, 7) huir y que el lobo lo recuerde.
 ## Corre en CI con: godot --headless --path . res://tools/tests/duel_test.tscn
 
-const GREYBOX: PackedScene = preload("res://world/greybox/greybox.tscn")
+const WORLD: PackedScene = preload("res://world/world.tscn")
 
 var _failures: PackedStringArray = []
-var _world: Node3D
+var _world: World
 var _player: Player
 var _one: OneHandControls
 var _duel: Duel
@@ -22,12 +22,12 @@ func _ready() -> void:
 	Piedra.save_enabled = false
 	Piedra.use_record(PlayerRecord.new())
 	Inventory.save_enabled = false
-	_world = GREYBOX.instantiate()
+	_world = WORLD.instantiate() as World
 	add_child(_world)
 	_player = _world.get_node("Player")
 	_one = _world.get_node("HUD/SafeArea/OneHandControls")
 	_duel = _world.get_node("Duel")
-	_rival = _world.get_node("Enemies/AshWolf")
+	_rival = _world.zone.get_node("Enemies/AshWolf")
 	_ui = _duel.get_node("SafeArea/DuelUI")
 	await _frames(10)
 	_player.settings.haptics_enabled = false

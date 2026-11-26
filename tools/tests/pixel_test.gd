@@ -6,7 +6,7 @@ extends Node
 ## 5) la prueba de rendimiento corre (modo rápido) y produce un reporte.
 ## Corre en CI con: godot --headless --path . res://tools/tests/pixel_test.tscn
 
-const GREYBOX: PackedScene = preload("res://world/greybox/greybox.tscn")
+const WORLD: PackedScene = preload("res://world/world.tscn")
 const BENCH: PackedScene = preload("res://world/benchmark/benchmark.tscn")
 
 var _failures: PackedStringArray = []
@@ -28,7 +28,7 @@ func _ready() -> void:
 
 func _run() -> void:
 	var root: Window = get_tree().root
-	var world: Node3D = GREYBOX.instantiate()
+	var world: Node3D = WORLD.instantiate()
 	add_child(world)
 	var player: Player = world.get_node("Player")
 	await _frames(5)

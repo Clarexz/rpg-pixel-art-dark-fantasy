@@ -5,10 +5,10 @@ extends Node
 ##
 ## Analogía web: un test de Playwright que hace page.touchscreen.tap().
 
-const GREYBOX: PackedScene = preload("res://world/greybox/greybox.tscn")
+const WORLD: PackedScene = preload("res://world/world.tscn")
 
 var _failures: PackedStringArray = []
-var _world: Node3D
+var _world: World
 var _player: Player
 var _touch: TouchControls
 
@@ -16,7 +16,7 @@ var _touch: TouchControls
 func _ready() -> void:
 	RivalRegistry.save_enabled = false
 	Piedra.save_enabled = false
-	_world = GREYBOX.instantiate()
+	_world = WORLD.instantiate() as World
 	add_child(_world)
 	_player = _world.get_node("Player")
 	_touch = _world.get_node("HUD/SafeArea/TouchControls")

@@ -64,7 +64,7 @@ Si fallas, el enemigo ataca. Un rival recuerda que huiste y te lo echa en cara (
 
 Nada nuevo se acerca al claim 1 de US 10,926,179 (ver [rivales-y-piedra.md](rivales-y-piedra.md)). No es asesoría legal.
 
-- Los enemigos comunes **no tienen memoria ni rango**: `greybox.gd` solo pide memoria si `enemy.is_rival()`. La prueba `combat_test` falla si el Carroñero termina con memoria.
+- Los enemigos comunes **no tienen memoria ni rango**: `world/world.gd` solo pide memoria si `enemy.is_rival()`. La prueba `combat_test` falla si el Carroñero termina con memoria.
 - El patrón de un enemigo (`EnemyAI.choose`) solo recibe **su propia ficha**. Las tácticas de un rival siguen saliendo solo de su ficha y su memoria (`RivalTactics.plan(RivalData, RivalMemory)`), y sus pruebas siguen en CI.
 - Lo que pasa con un enemigo no cambia a ningún otro. Las piedras solo cambian de manos a través de ti.
 

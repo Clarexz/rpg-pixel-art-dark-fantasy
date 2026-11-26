@@ -1,6 +1,6 @@
 [gd_scene load_steps=4 format=3]
 
-[ext_resource type="Script" path="res://world/greybox/training_dummy.gd" id="1_dummy"]
+[ext_resource type="Script" path="res://world/zones/greybox/training_dummy.gd" id="1_dummy"]
 [ext_resource type="Texture2D" path="res://assets/placeholder/sprites/espantapajaros.png" id="2_tex"]
 
 [sub_resource type="CylinderShape3D" id="shape"]

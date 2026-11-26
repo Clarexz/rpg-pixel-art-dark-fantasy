@@ -103,6 +103,9 @@ jobs:
       - name: Prueba del combate real (enemigos, patrones, items, huir)
         run: timeout 300 $GODOT --headless --path . res://tools/tests/combat_test.tscn
 
+      - name: Prueba de mundo y zonas (cargar y cambiar de zona)
+        run: timeout 300 $GODOT --headless --path . res://tools/tests/zone_test.tscn
+
       - name: Versión
         id: version
         run: tools/ci/version.sh | tee -a "$GITHUB_OUTPUT"
