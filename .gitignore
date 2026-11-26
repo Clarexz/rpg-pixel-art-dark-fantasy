@@ -1,0 +1,13 @@
+# Cache del editor de Godot (como node_modules/.next: se regenera solo)
+.godot/
+/android/
+# Builds locales
+/build/
+*.apk
+*.aab
+*.idsig
+# Llaves de firma: NUNCA al repo
+*.keystore
+*.jks
+export_credentials.cfg
+.DS_Store

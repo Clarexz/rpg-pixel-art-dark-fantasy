@@ -1,0 +1,166 @@
+# Construye el APK de Android con Godot en modo headless (sin ventana).
+#
+# - Pull request  -> smoke test + APK de prueba como "artifact" del run (no se publica).
+# - Push a main   -> smoke test + APK firmado + GitHub Release "vX.Y.Z"
+#                    (solo si esa versión todavía no tiene release).
+# - Manual        -> pestaña Actions > Android build > Run workflow
+#                    (en main publica release; en otra rama solo deja el artifact).
+#
+# La versión sale de project.godot (application/config/version). Para publicar
+# un release nuevo, se sube esa versión en el PR.
+name: Android build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: 4.7.2
+  GODOT_FLAVOR: stable
+  ANDROID_BUILD_TOOLS: 35.0.1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Cache de Godot + export templates
+        id: godot-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/godot-bin
+            ~/.local/share/godot/export_templates
+          key: godot-${{ env.GODOT_VERSION }}-${{ env.GODOT_FLAVOR }}
+
+      - name: Descargar Godot + export templates
+        if: steps.godot-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          # Releases oficiales de Godot en GitHub (downloads.godotengine.org bloquea a los runners).
+          TAG="${GODOT_VERSION}-${GODOT_FLAVOR}"
+          BASE="https://github.com/godotengine/godot/releases/download/${TAG}"
+          mkdir -p ~/godot-bin ~/.local/share/godot/export_templates
+          curl -fsSL --retry 3 -o /tmp/godot.zip "${BASE}/Godot_v${TAG}_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d ~/godot-bin
+          mv ~/godot-bin/Godot_v*_linux.x86_64 ~/godot-bin/godot
+          curl -fsSL --retry 3 -o /tmp/templates.tpz "${BASE}/Godot_v${TAG}_export_templates.tpz"
+          unzip -q /tmp/templates.tpz -d /tmp/tpl
+          mv /tmp/tpl/templates ~/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_FLAVOR}
+
+      - name: Configurar Godot (rutas de Android SDK y Java)
+        run: |
+          set -euo pipefail
+          chmod +x ~/godot-bin/godot
+          echo "GODOT=$HOME/godot-bin/godot" >> "$GITHUB_ENV"
+          (yes || true) | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;${ANDROID_BUILD_TOOLS}" "platform-tools" > /dev/null || true
+          test -x "$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/apksigner"
+          MINOR=$(echo "$GODOT_VERSION" | cut -d. -f1,2)
+          mkdir -p ~/.config/godot
+          cat > ~/.config/godot/editor_settings-${MINOR}.tres <<EOF
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/android_sdk_path = "$ANDROID_HOME"
+          export/android/java_sdk_path = "$JAVA_HOME"
+          EOF
+          sed -i 's/^ *//' ~/.config/godot/editor_settings-${MINOR}.tres
+
+      - name: Importar assets
+        run: $GODOT --headless --path . --import
+
+      - name: Smoke test (el juego arranca sin errores)
+        run: tools/ci/smoke_test.sh
+
+      - name: Versión
+        id: version
+        run: tools/ci/version.sh | tee -a "$GITHUB_OUTPUT"
+
+      - name: ¿Ya existe el release?
+        id: release-check
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v${{ steps.version.outputs.version }}" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::v${{ steps.version.outputs.version }} ya tiene release. Sube config/version en project.godot para publicar uno nuevo."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Preparar keystore de release
+        id: keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "has_keystore=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Faltan los secrets ANDROID_KEYSTORE_*. El APK se firma con una llave de debug temporal: no se podrá instalar encima de otro APK, hay que desinstalar antes."
+            exit 0
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          {
+            echo "GODOT_ANDROID_KEYSTORE_RELEASE_PATH=$RUNNER_TEMP/release.keystore"
+            echo "GODOT_ANDROID_KEYSTORE_RELEASE_USER=$KEY_ALIAS"
+            echo "GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=$KEYSTORE_PASSWORD"
+          } >> "$GITHUB_ENV"
+          echo "has_keystore=true" >> "$GITHUB_OUTPUT"
+
+      - name: Exportar APK
+        id: export
+        run: |
+          set -euo pipefail
+          mkdir -p build/android
+          APK="build/android/rpg-pixel-v${{ steps.version.outputs.version }}.apk"
+          if [ "${{ steps.keystore.outputs.has_keystore }}" = "true" ]; then
+            $GODOT --headless --path . --export-release "Android" "$APK"
+          else
+            $GODOT --headless --path . --export-debug "Android" "$APK"
+          fi
+          test -f "$APK" || { echo "::error::Godot no generó el APK"; exit 1; }
+          BT="$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}"
+          "$BT/apksigner" verify --print-certs "$APK" | head -3
+          "$BT/aapt2" dump badging "$APK" 2>/dev/null | grep -E "^package|targetSdk|native-code"
+          echo "apk=$APK" >> "$GITHUB_OUTPUT"
+
+      - name: Subir APK como artifact del run
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-v${{ steps.version.outputs.version }}-${{ github.run_number }}
+          path: ${{ steps.export.outputs.apk }}
+          retention-days: 14
+
+      - name: Publicar GitHub Release
+        if: github.ref == 'refs/heads/main' && steps.release-check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="v${{ steps.version.outputs.version }}"
+          FLAGS="--generate-notes --target ${{ github.sha }}"
+          NOTES="APK para Android (arm64). Descárgalo desde el celular y ábrelo para instalar."
+          if [ "${{ steps.keystore.outputs.has_keystore }}" != "true" ]; then
+            FLAGS="$FLAGS --prerelease"
+            NOTES="$NOTES\n\n> Firmado con llave de debug temporal: desinstala la versión anterior antes de instalar esta."
+          fi
+          gh release create "$TAG" "${{ steps.export.outputs.apk }}" \
+            --title "$TAG" --notes "$(printf "$NOTES")" $FLAGS
