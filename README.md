@@ -32,7 +32,7 @@ La carpeta `.godot/` es caché que el editor regenera (como `node_modules` o `.n
 | `items/` | Inventario guardado y catálogo de items |
 | `piedra/` | La piedra mágica: poder, lectura (scouter), memoria del mundo |
 | `combat/` | El duelo por turnos: reglas (`duel.gd`), su pantalla (`duel_ui.gd`), fichas de enemigo (`enemy_data.gd`, `enemy_move.gd`) y patrones (`enemy_ai.gd`) |
-| `world/` | El mundo y sus zonas. `world/world.tscn` es lo fijo (jugador, HUD, duelo) y carga una zona de `world/zones/` (hoy `greybox/`, el nivel gris); `world/demo/` el cubo de la fase 0 |
+| `world/` | El mundo y sus zonas. `world/world.tscn` es lo fijo (jugador, HUD, duelo) y carga una zona de `world/zones/`: `hondonada/` (la primera zona) o `greybox/` (el campo de pruebas); `world/demo/` el cubo de la fase 0 |
 | `ui/` | HUD y menús. `ui/safe_area/` respeta notch y barra de gestos |
 | `core/` | Autoloads (globales). Hoy: `Sfx`, sonidos placeholder generados por código |
 | `assets/` | Arte y audio compartido entre features |

@@ -29,6 +29,8 @@ func _ready() -> void:
 	test_inventory()
 	test_flee_chance()
 	_world = WORLD.instantiate() as World
+	# Estas pruebas usan el campo de pruebas (nivel gris).
+	_world.start_zone = load(World.PRACTICE_ZONE)
 	add_child(_world)
 	_player = _world.get_node("Player")
 	_duel = _world.get_node("Duel")

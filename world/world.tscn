@@ -1,7 +1,6 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://world/world.gd" id="1_main"]
-[ext_resource type="PackedScene" path="res://world/zones/greybox/greybox.tscn" id="13_zone"]
 [ext_resource type="PackedScene" path="res://player/player.tscn" id="2_player"]
 [ext_resource type="Script" path="res://ui/safe_area/safe_area_container.gd" id="5_safe"]
 [ext_resource type="Script" path="res://ui/hud/debug_overlay.gd" id="6_debug"]
@@ -14,7 +13,6 @@
 
 [node name="World" type="Node3D"]
 script = ExtResource("1_main")
-start_zone = ExtResource("13_zone")
 
 [node name="ZoneSlot" type="Node3D" parent="."]
 
