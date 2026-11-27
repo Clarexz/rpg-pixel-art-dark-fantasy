@@ -7,11 +7,11 @@ extends Control
 ##   │ "La última vez…"  │
 ##   │                   │
 ##   │   (!)   ◯→        │  centro: el rival y la flecha + aro de su ataque
+##   │ ¡aviso de turno!  │  una línea de aviso bajo el rival
 ##   │                   │
-##   │ PV ███  PA ●●  PM │  abajo: tus barras
-##   │      [Volver][Fin]│
-##   │  [Bloq][Bloq][Bloq]│  la cuadrícula 2x3 (o el menú 2x2) pegada a la
-##   │  [Atac][Atac][Atac]│  orilla del lado de tu mano
+##   │        [Volver][Fin]│
+##   │ PV 100 [Bloq][Bloq][Bloq]│  la cuadrícula 2x3 (o el arco) pegada a la
+##   │ ●●●●  [Atac][Atac][Atac]│  orilla de tu mano; tus PV/PA/PM en la esquina libre
 ##   └───────────────────┘
 ##
 ## No conoce las reglas: muestra lo que Duel le pide y avisa con `event`
@@ -42,8 +42,6 @@ const ARC: Array[Dictionary] = [
 ]
 ## Margen en la orilla de la mano de los botones de la cuadrícula.
 const HAND_MARGIN: float = 16.0
-## Alto que se reserva abajo para el arco (que no lo tape el panel de barras).
-const ARC_RESERVED: float = 520.0
 const CLUSTER_W: float = 480.0
 const CELL_H: float = 124.0
 const GAP: float = 10.0
@@ -58,12 +56,7 @@ var _rival_bar: ProgressBar
 var _status: Label
 var _dialog: Label
 var _prompt: Label
-var _hp_bar: ProgressBar
-var _hp_label: Label
-var _pa_bar: ProgressBar
-var _pa_label: Label
-var _pm_bar: ProgressBar
-var _pm_label: Label
+var _hud: PlayerHud
 var _song: SongDisplay
 var _util_row: HBoxContainer
 var _back_button: Button
@@ -96,15 +89,12 @@ func set_rival(rival_name: String, hp: int, max_hp: int) -> void:
 
 
 func set_stats(hp: int, max_hp: int, pa: int, max_pa: int, pm: int, max_pm: int) -> void:
-	_hp_bar.max_value = max_hp
-	_hp_bar.value = hp
-	_hp_label.text = "PV %d" % hp
-	_pa_bar.max_value = max_pa
-	_pa_bar.value = pa
-	_pa_label.text = "PA %d" % pa
-	_pm_bar.max_value = max_pm
-	_pm_bar.value = pm
-	_pm_label.text = "PM %d" % pm
+	_hud.set_stats(hp, max_hp, pa, max_pa, pm, max_pm)
+
+
+## Para las pruebas: el HUD del jugador (esquina libre, lado contrario a la mano).
+func player_hud() -> PlayerHud:
+	return _hud
 
 
 ## Estado del enemigo debajo de su barra (p. ej. "Cargando..."). "" = nada.
@@ -127,7 +117,6 @@ func prompt(text: String) -> void:
 func show_menu(flee_hint: String = "") -> void:
 	_set_util(false, false)
 	_fill(3, [])
-	_cluster_row.custom_minimum_size.y = ARC_RESERVED - 10.0
 	var entries: Array[Dictionary] = []
 	for i: int in ARC.size():
 		var e: Dictionary = ARC[i].duplicate()
@@ -310,6 +299,16 @@ func _build() -> void:
 	_dialog.add_theme_font_size_override("font_size", 28)
 	top_box.add_child(_dialog)
 
+	# Aviso de una línea bajo el rival (el HUD de abajo es muy angosto para texto).
+	_prompt = Label.new()
+	_prompt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_prompt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_prompt.add_theme_font_size_override("font_size", 24)
+	_prompt.add_theme_color_override("font_outline_color", CombatStyle.OUTLINE)
+	_prompt.add_theme_constant_override("outline_size", 8)
+	root.add_child(_prompt)
+
 	var spacer: Control = Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -320,28 +319,6 @@ func _build() -> void:
 	CombatStyle.style_title_label(_banner, 64, 14)
 	_banner.hide()
 	root.add_child(_banner)
-
-	# Abajo: tus barras.
-	var stats: PanelContainer = PanelContainer.new()
-	stats.add_theme_stylebox_override("panel", _box(Color(0, 0, 0, 0.55), 12))
-	stats.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(stats)
-	var stats_box: VBoxContainer = VBoxContainer.new()
-	stats_box.add_theme_constant_override("separation", 6)
-	stats.add_child(stats_box)
-	_hp_label = Label.new()
-	_hp_bar = _bar(Color(0.8, 0.25, 0.25), 22)
-	stats_box.add_child(_stat_row(_hp_label, _hp_bar))
-	_pa_label = Label.new()
-	_pa_bar = _bar(Color(0.95, 0.6, 0.15), 18)
-	stats_box.add_child(_stat_row(_pa_label, _pa_bar))
-	_pm_label = Label.new()
-	_pm_bar = _bar(Color(0.3, 0.55, 1.0), 18)
-	stats_box.add_child(_stat_row(_pm_label, _pm_bar))
-	_prompt = Label.new()
-	_prompt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_prompt.add_theme_font_size_override("font_size", 26)
-	stats_box.add_child(_prompt)
 
 	_song = SongDisplay.new()
 	_song.custom_minimum_size = Vector2(0, 96)
@@ -368,6 +345,10 @@ func _build() -> void:
 	bottom_pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(bottom_pad)
 
+	# Tus PV/PA/PM: esquina libre del lado contrario a la mano (ver PlayerHud).
+	_hud = PlayerHud.new()
+	add_child(_hud)
+
 	# Menú en arco: encima de todo salvo el destello.
 	_arc = ArcMenu.new()
 	_arc.hide()
@@ -385,6 +366,7 @@ func _build() -> void:
 ## Pega los botones a la orilla de tu mano (derecha, o izquierda en zurdo).
 func apply_hand() -> void:
 	_arc.left_handed = left_handed
+	_hud.left_handed = left_handed
 	for row: HBoxContainer in [_util_row, _cluster_row]:
 		for child: Node in row.get_children():
 			row.remove_child(child)
@@ -422,7 +404,6 @@ func _fill(columns: int, defs: Array[Dictionary]) -> void:
 		child.queue_free()
 	_buttons.clear()
 	_arc.hide()
-	_cluster_row.custom_minimum_size.y = 0.0
 	_buttons["back:0"] = _back_button
 	_buttons["end:0"] = _end_button
 	_cluster.columns = columns
@@ -486,11 +467,3 @@ func _bar(color: Color, height: float) -> ProgressBar:
 	bar.add_theme_stylebox_override("fill", fill)
 	bar.add_theme_stylebox_override("background", bg)
 	return bar
-
-
-func _stat_row(label: Label, bar: ProgressBar) -> HBoxContainer:
-	var row: HBoxContainer = HBoxContainer.new()
-	label.custom_minimum_size = Vector2(110, 0)
-	row.add_child(label)
-	row.add_child(bar)
-	return row

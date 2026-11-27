@@ -79,6 +79,69 @@ func _run() -> void:
 	# Y las celdas son rectas (sin inclinación).
 	var cell_box: StyleBoxFlat = ui.button_for(&"cell", 0).get_theme_stylebox("normal") as StyleBoxFlat
 	_check(cell_box.skew == Vector2.ZERO, "las celdas no deberían estar inclinadas")
+	await _check_hud(ui, host)
+
+
+## El HUD del jugador vive en la esquina libre (lado contrario a la mano) y no
+## toca el arco ni ningún botón en ningún estado del menú.
+func _check_hud(ui: DuelUI, host: Control) -> void:
+	var spells: Array = [
+		{"name": "Trueno", "cost": 4}, {"name": "Egida", "cost": 3}, {"name": "Cura", "cost": 5},
+		{"name": "Rayo", "cost": 6}, {"name": "Hielo", "cost": 2}]
+	var items: Array = [
+		{"name": "Pocion", "desc": "Cura 30", "count": 2}, {"name": "Ether", "desc": "+4 PM", "count": 1},
+		{"name": "Humo", "desc": "Huir", "count": 0}, {"name": "Piedra", "desc": "Lanza", "count": 3}]
+	ui.set_stats(80, 100, 3, 9, 5, 12)
+	for left: bool in [false, true]:
+		ui.left_handed = left
+		ui.apply_hand()
+		var tag: String = "zurdo" if left else "diestro"
+		var hud: PlayerHud = ui.player_hud()
+		for state: String in ["menu", "grid", "grid_util", "spells", "items"]:
+			match state:
+				"menu": ui.show_menu("fácil")
+				"grid": ui.show_grid(DuelUI.Rows.BOTH, false, false)
+				"grid_util": ui.show_grid(DuelUI.Rows.BOTH, true, true)
+				"spells": ui.show_spells(spells, 20)
+				"items": ui.show_items(items)
+			await _wait(0.4)
+			var r: Rect2 = hud.get_global_rect()
+			var where: String = "%s/%s" % [tag, state]
+			_check(hud.is_visible_in_tree(), "%s: el HUD no se ve" % where)
+			_check(Rect2(Vector2.ZERO, host.size).encloses(r), "%s: el HUD se sale de la pantalla %s" % [where, r])
+			_check(r.size.x <= 190.0 and r.size.y <= 230.0, "%s: el HUD es muy grande %s" % [where, r.size])
+			# Esquina contraria a la mano, pegada abajo.
+			var on_left: bool = r.get_center().x < host.size.x * 0.5
+			_check(on_left != left, "%s: el HUD no está en la esquina contraria a la mano %s" % [where, r])
+			_check(r.end.y > host.size.y - 40.0, "%s: el HUD no está pegado abajo %s" % [where, r])
+			# Arco: ningún punto del HUD cae dentro del radio exterior (520) del pivote.
+			var arc: ArcMenu = ui.arc_menu()
+			var pivot: Vector2 = arc.get_global_transform() * arc.pivot()
+			var near: Vector2 = Vector2(clampf(pivot.x, r.position.x, r.end.x), clampf(pivot.y, r.position.y, r.end.y))
+			_check(near.distance_to(pivot) > ArcMenu.RING_OUT[1] + 4.0, "%s: el HUD toca el arco (%.0f px del pivote)" % [where, near.distance_to(pivot)])
+			# Botones visibles: ninguno cruza el HUD.
+			var rects: Array[Rect2] = []
+			for key: String in ["back:0", "end:0", "cell:0", "cell:1", "cell:2", "cell:3", "cell:4", "cell:5",
+					"spell:0", "spell:1", "spell:2", "spell:3", "spell:4", "item:0", "item:1", "item:2", "item:3"]:
+				var b: Button = ui.button_for(StringName(key.get_slice(":", 0)), int(key.get_slice(":", 1)))
+				if b != null and b.is_visible_in_tree():
+					rects.append(b.get_global_rect())
+			for br: Rect2 in rects:
+				_check(not r.intersects(br), "%s: el HUD cruza un botón %s" % [where, br])
+			if state in ["grid", "grid_util", "spells", "items"]:
+				_check(rects.size() >= 2, "%s: no se encontraron botones para comparar" % where)
+	# 9 PA máximos con 3 llenos: 9 pips, 3 encendidos.
+	ui.left_handed = false
+	ui.apply_hand()
+	ui.set_stats(60, 100, 3, 9, 7, 12)
+	_check(ui.player_hud().pip_count(&"pa") == 9, "el HUD debería tener 9 pips de PA")
+	_check(ui.player_hud().lit_count(&"pa") == 3, "el HUD debería tener 3 PA encendidos")
+	_check(ui.player_hud().pip_count(&"pm") == 12 and ui.player_hud().lit_count(&"pm") == 7, "pips de PM mal")
+	_check(ui.player_hud().hp_value() == 60, "el HUD no guardó los PV")
+	ui.set_stats(40, 100, 1, 9, 7, 12)
+	await _wait(0.5)  # las animaciones de gasto/destello terminan solas
+	_check(ui.player_hud().lit_count(&"pa") == 1, "el HUD no bajó los PA")
+	_check(not ui.player_hud().is_processing(), "el HUD sigue animando de más")
 
 
 ## Toca un punto global (como el pulgar): ScreenTouch abajo y arriba.
