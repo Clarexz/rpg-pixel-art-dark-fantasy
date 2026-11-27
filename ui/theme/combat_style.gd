@@ -9,6 +9,8 @@ extends RefCounted
 const SKEW: float = 0.3
 
 const ATTACK: Color = Color(0.77, 0.16, 0.17)
+## Brasa: cuerpo a cuerpo y puntos de acción (no cambia ATTACK, que usan las celdas).
+const MELEE: Color = Color8(214, 104, 40)
 const SPELL: Color = Color(0.42, 0.35, 0.8)
 const ITEMS: Color = Color(0.59, 0.43, 0.24)
 const FLEE: Color = Color(0.27, 0.27, 0.31)

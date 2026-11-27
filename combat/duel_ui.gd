@@ -35,10 +35,10 @@ const COLOR_MENU: Color = CombatStyle.ITEMS
 ## Ángulos en grados desde el pivote (mano derecha): 180 = izquierda, 270 = arriba.
 ## Anillo 0 (interior) = lo más usado; anillo 1 (exterior) = lo menos usado.
 const ARC: Array[Dictionary] = [
-	{"text": "CUERPO A\nCUERPO", "color": CombatStyle.ATTACK, "ring": 0, "a0": 182.0, "a1": 228.0},
-	{"text": "HECHIZOS", "color": CombatStyle.SPELL, "ring": 0, "a0": 232.0, "a1": 268.0},
-	{"text": "ITEMS", "color": CombatStyle.ITEMS, "ring": 1, "a0": 190.0, "a1": 228.0},
-	{"text": "HUIR", "color": CombatStyle.FLEE, "ring": 1, "a0": 232.0, "a1": 268.0},
+	{"text": "CUERPO A\nCUERPO", "color": CombatStyle.MELEE, "ring": 0, "a0": 182.0, "a1": 223.0},
+	{"text": "HECHIZOS", "color": CombatStyle.SPELL, "ring": 0, "a0": 227.0, "a1": 268.0},
+	{"text": "ITEMS", "color": CombatStyle.ITEMS, "ring": 1, "a0": 182.0, "a1": 223.0},
+	{"text": "HUIR", "color": CombatStyle.FLEE, "ring": 1, "a0": 227.0, "a1": 268.0},
 ]
 ## Margen en la orilla de la mano de los botones de la cuadrícula.
 const HAND_MARGIN: float = 16.0
@@ -92,7 +92,7 @@ func set_stats(hp: int, max_hp: int, pa: int, max_pa: int, pm: int, max_pm: int)
 	_hud.set_stats(hp, max_hp, pa, max_pa, pm, max_pm)
 
 
-## Para las pruebas: el HUD del jugador (esquina libre, lado contrario a la mano).
+## Para las pruebas: el HUD del jugador (integrado al arco; compacto en la esquina contraria).
 func player_hud() -> PlayerHud:
 	return _hud
 
@@ -127,6 +127,7 @@ func show_menu(flee_hint: String = "") -> void:
 	_arc.left_handed = left_handed
 	_arc.set_entries(entries, true)
 	_arc.show()
+	_hud.compact = false
 
 
 ## Para las pruebas: punto global (centro) del sector `index` del menú en arco.
@@ -345,7 +346,7 @@ func _build() -> void:
 	bottom_pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(bottom_pad)
 
-	# Tus PV/PA/PM: esquina libre del lado contrario a la mano (ver PlayerHud).
+	# Tus PV/PA/PM: dibujados bajo el arco (ver PlayerHud).
 	_hud = PlayerHud.new()
 	add_child(_hud)
 
@@ -404,6 +405,7 @@ func _fill(columns: int, defs: Array[Dictionary]) -> void:
 		child.queue_free()
 	_buttons.clear()
 	_arc.hide()
+	_hud.compact = true
 	_buttons["back:0"] = _back_button
 	_buttons["end:0"] = _end_button
 	_cluster.columns = columns

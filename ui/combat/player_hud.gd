@@ -1,46 +1,50 @@
 class_name PlayerHud
 extends Control
-## Estado del jugador en combate, dibujado por código y recto (sin diagonales):
-## PV con número grande y barra, y debajo los PA (círculos dorados) y los PM
-## (rombos morados), uno por punto máximo: lleno = disponible, hueco = gastado.
+## Estado del jugador en combate, integrado en el arco del menú: PV como un
+## arco largo, y PA / PM como segmentos curvos, uno por punto máximo (encendido =
+## disponible, apagado = gastado). Dibujado por código, a pantalla completa y
+## por debajo del ArcMenu (que comparte pivote y geometría).
 ##
-## Dónde va (lo coloca DuelUI): en la esquina inferior del lado CONTRARIO a la
-## mano, dentro del hueco que deja el arco del menú. El arco sale del pivote
-## (esquina inferior de la mano) con radio exterior 520 px; en 720 de ancho el
-## borde más cercano del HUD (su esquina inferior interna) queda a 532 px del
-## pivote, así que nunca lo toca. La cuadrícula/botones útiles ocupan como
-## mucho 480 px pegados a la orilla de la mano (x 224..704), y el HUD llega
-## hasta x 188: no se cruzan en ningún estado, y como el HUD no se mueve no
-## hace falta recalcular nada al cambiar de menú.
+## Dos modos (propiedad `compact`):
+## - Completo: pivote = el del arco (esquina de la mano). Base de piedra grande
+##   detrás del arco; PV y PA/PM caen justo en los bordes de los anillos.
+## - Compacto: cuando la cuadrícula/hechizos/items ocupan la esquina de la
+##   mano, el HUD pasa a un cuarto de disco de 214 px en la esquina contraria,
+##   abierto hacia el centro. No llega a la cuadrícula (empieza en x≈224).
+## Ángulos como en ArcMenu (diestro: 180 = izquierda, 270 = arriba; zurdo espeja).
 
-## Tamaño fijo del panel y su separación de la orilla (la zona segura de abajo
-## es la misma que la del arco y los botones).
-const HUD_SIZE: Vector2 = Vector2(182.0, 202.0)
-const EDGE_MARGIN: float = 6.0
 const BOTTOM_MARGIN: float = 24.0
+## Radio del cuarto de disco del modo compacto.
+const COMPACT_R: float = 214.0
+const STEP_DEG: float = 3.0
+const SEG_GAP_DEG: float = 1.6
 
-const PAD: float = 8.0
-const PIP_R: float = 9.0
-const PIP_GAP: float = 3.0
-const PIP_COLS: int = 6
-const ROW_PITCH: float = 22.0
-const HP_BAR_H: float = 20.0
-const NUM_SIZE: int = 40
-const LABEL_SIZE: int = 20
-const LABEL_W: float = 34.0
-
-const COLOR_HP: Color = Color(0.8, 0.2, 0.22)
-const COLOR_PA: Color = Color(0.91, 0.72, 0.28)
-const COLOR_PM: Color = Color(0.42, 0.35, 0.8)
-const COLOR_EMPTY: Color = Color(0.12, 0.1, 0.15)
+const COLOR_HP: Color = Color8(196, 40, 44)
+const COLOR_PA: Color = CombatStyle.MELEE
+const COLOR_PM: Color = Color8(140, 120, 255)
+const COLOR_OFF: Color = Color8(40, 34, 46)
+const COLOR_STONE: Color = Color8(22, 17, 28, 230)
 
 const HP_FLASH_TIME: float = 0.35
 const PIP_ANIM_TIME: float = 0.3
+const MODE_FADE_TIME: float = 0.15
+
+## Rangos de ángulo (iguales en los dos modos): PA junto al suelo, PM hacia arriba.
+const PA_A: Vector2 = Vector2(182.0, 223.0)
+const PM_A: Vector2 = Vector2(227.0, 268.0)
+const HP_A: Vector2 = Vector2(182.0, 268.0)
 
 var left_handed: bool = false:
 	set(value):
 		left_handed = value
-		place()
+		queue_redraw()
+var compact: bool = false:
+	set(value):
+		if value == compact:
+			return
+		compact = value
+		_fade_in()
+		queue_redraw()
 
 var _hp: int = 0
 var _max_hp: int = 1
@@ -54,29 +58,96 @@ var _hp_flash: float = 0.0
 ## +1 = se acaba de recuperar, -1 = se acaba de gastar.
 var _pip_t: Dictionary = {&"pa": [], &"pm": []}
 var _pip_dir: Dictionary = {&"pa": [], &"pm": []}
+var _tween: Tween
 
 
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	custom_minimum_size = HUD_SIZE
+	set_anchors_preset(Control.PRESET_FULL_RECT)
 	set_process(false)
-	place()
 
 
-## Esquina inferior del lado contrario a la mano (diestro: abajo-izquierda).
-func place() -> void:
-	if left_handed:
-		set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-		offset_left = -(EDGE_MARGIN + HUD_SIZE.x)
-		offset_right = -EDGE_MARGIN
+func _ready() -> void:
+	resized.connect(queue_redraw)
+
+
+# --- Geometría compartida ----------------------------------------------------
+
+func _scale() -> float:
+	return ArcMenu.scale_for(size.x)
+
+
+## El modo compacto va en la esquina contraria, y todo se espeja con ella.
+func _mirrored() -> bool:
+	return left_handed != compact
+
+
+## Pivote local del modo actual. En modo completo coincide con ArcMenu.pivot().
+func pivot() -> Vector2:
+	return Vector2(0.0 if _mirrored() else size.x, size.y - BOTTOM_MARGIN)
+
+
+## Radio exterior de la base (para las pruebas): lo que ocupa el HUD desde su pivote.
+func dial_radius() -> float:
+	return (COMPACT_R if compact else 462.0) * _scale()
+
+
+## Geometría del modo actual (radios sin escalar).
+func _geo() -> Dictionary:
+	if compact:
+		return {"base": Vector2(0.0, COMPACT_R), "base_a": Vector2(180.0, 270.0),
+				"hp": Vector2(150.0, 170.0), "seg": Vector2(112.0, 132.0),
+				"num_r": 62.0, "num_a": 225.0, "num_size": 32}
+	return {"base": Vector2(170.0, 462.0), "base_a": Vector2(179.0, 271.0),
+			"hp": Vector2(184.0, 208.0), "seg": Vector2(344.0, 366.0),
+			"num_r": 154.0, "num_a": 186.0, "num_size": 30}
+
+
+func _pt(r: float, deg: float) -> Vector2:
+	return ArcMenu.polar(pivot(), r, deg, _mirrored())
+
+
+## Sector anular (o de disco si r0 <= 0), r en px reales.
+func _sector(r0: float, r1: float, a0: float, a1: float) -> PackedVector2Array:
+	var pts: PackedVector2Array = PackedVector2Array()
+	var steps: int = maxi(2, ceili(absf(a1 - a0) / STEP_DEG))
+	for s: int in steps + 1:
+		pts.append(_pt(r1, lerpf(a0, a1, float(s) / steps)))
+	if r0 <= 0.5:
+		pts.append(pivot())
 	else:
-		set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-		offset_left = EDGE_MARGIN
-		offset_right = EDGE_MARGIN + HUD_SIZE.x
-	offset_top = -(BOTTOM_MARGIN + HUD_SIZE.y)
-	offset_bottom = -BOTTOM_MARGIN
-	queue_redraw()
+		for s: int in steps + 1:
+			pts.append(_pt(r0, lerpf(a1, a0, float(s) / steps)))
+	return pts
 
+
+func _seg_range(kind: StringName) -> Vector2:
+	return PA_A if kind == &"pa" else PM_A
+
+
+## Ángulos (a0, a1) del segmento i de `kind`, ya con el hueco entre segmentos.
+func _seg_angles(kind: StringName, i: int) -> Vector2:
+	var rng: Vector2 = _seg_range(kind)
+	var n: int = maxi(pip_count(kind), 1)
+	var step: float = (rng.y - rng.x) / n
+	return Vector2(rng.x + i * step + SEG_GAP_DEG * 0.5, rng.x + (i + 1) * step - SEG_GAP_DEG * 0.5)
+
+
+## Para las pruebas: rectángulo global que envuelve al segmento i de `kind`.
+func segment_rect_global(kind: StringName, i: int) -> Rect2:
+	var g: Dictionary = _geo()
+	var k: float = _scale()
+	var seg: Vector2 = g.seg
+	var a: Vector2 = _seg_angles(kind, i)
+	var pts: PackedVector2Array = _sector(seg.x * k, seg.y * k, a.x, a.y)
+	var xf: Transform2D = get_global_transform()
+	var r: Rect2 = Rect2(xf * pts[0], Vector2.ZERO)
+	for q: Vector2 in pts:
+		r = r.expand(xf * q)
+	return r
+
+
+# --- Datos -------------------------------------------------------------------
 
 func set_stats(hp: int, max_hp: int, pa: int, max_pa: int, pm: int, max_pm: int) -> void:
 	if _started:
@@ -100,7 +171,7 @@ func set_stats(hp: int, max_hp: int, pa: int, max_pa: int, pm: int, max_pm: int)
 	queue_redraw()
 
 
-## Para las pruebas: cuántos pips hay de "pa" o "pm" y cuántos están llenos.
+## Para las pruebas: cuántos segmentos hay de "pa" o "pm" y cuántos están encendidos.
 func pip_count(kind: StringName) -> int:
 	return _max_pa if kind == &"pa" else _max_pm
 
@@ -120,7 +191,7 @@ func _zeros(n: int) -> Array:
 	return a
 
 
-## Marca qué pips cambiaron para que hagan "pop" o se enciendan.
+## Marca qué segmentos cambiaron para que hagan "pop" o se enciendan.
 func _note_change(kind: StringName, before: int, after: int, new_max: int) -> void:
 	var t: Array = _pip_t[kind]
 	var dir: Array = _pip_dir[kind]
@@ -142,6 +213,16 @@ func _wake() -> void:
 		set_process(true)
 
 
+func _fade_in() -> void:
+	if _tween:
+		_tween.kill()
+	if not is_inside_tree():
+		return
+	self_modulate.a = 0.0
+	_tween = create_tween()
+	_tween.tween_property(self, "self_modulate:a", 1.0, MODE_FADE_TIME)
+
+
 func _process(delta: float) -> void:
 	var busy: bool = false
 	if _hp_flash > 0.0:
@@ -158,74 +239,84 @@ func _process(delta: float) -> void:
 		set_process(false)
 
 
+# --- Dibujo ------------------------------------------------------------------
+
 func _draw() -> void:
-	var font: Font = CombatStyle.title_font()
-	# Fondo semitransparente con borde oscuro de 4 px, esquinas rectas.
-	draw_rect(Rect2(Vector2.ZERO, size), CombatStyle.PANEL)
-	draw_rect(Rect2(Vector2(2, 2), size - Vector2(4, 4)), CombatStyle.OUTLINE, false, 4.0)
-	var inner_w: float = size.x - PAD * 2.0
-	var y: float = PAD + 2.0
-	# PV: etiqueta chica + número grande con contorno oscuro.
-	_text(font, "PV", Vector2(PAD + 2.0, y + 34.0), LABEL_SIZE, Color(1, 1, 1, 0.75), 4)
-	_text(font, str(_hp), Vector2(PAD + LABEL_W + 4.0, y + 38.0), NUM_SIZE, Color.WHITE, 8)
-	y += 46.0
-	# Barra de PV: recta, contorno oscuro, destello blanco al recibir daño.
-	var bar: Rect2 = Rect2(PAD, y, inner_w, HP_BAR_H)
-	draw_rect(bar, COLOR_EMPTY)
+	var g: Dictionary = _geo()
+	var k: float = _scale()
+	var base: Vector2 = g.base
+	var base_a: Vector2 = g.base_a
+	# Sombra suave (polígonos un poco más grandes, cada vez más tenues) y base de piedra.
+	for j: int in 3:
+		var grow: float = 18.0 - 6.0 * j
+		var sh: PackedVector2Array = _sector(maxf(base.x * k - grow, 0.0), base.y * k + grow, base_a.x - 1.0, base_a.y + 1.0)
+		draw_colored_polygon(sh, Color(0, 0, 0, 0.1 + 0.05 * j))
+	var stone: PackedVector2Array = _sector(base.x * k, base.y * k, base_a.x, base_a.y)
+	draw_colored_polygon(stone, COLOR_STONE)
+	_outline(stone, CombatStyle.OUTLINE, 3.0)
+	# PV: fondo oscuro y relleno proporcional.
+	var hp: Vector2 = g.hp
+	var back: PackedVector2Array = _sector(hp.x * k, hp.y * k, HP_A.x, HP_A.y)
+	draw_colored_polygon(back, COLOR_HP.darkened(0.72))
 	var frac: float = clampf(float(_hp) / float(_max_hp), 0.0, 1.0)
-	draw_rect(Rect2(bar.position, Vector2(bar.size.x * frac, bar.size.y)), COLOR_HP.lerp(Color.WHITE, _hp_flash))
-	draw_rect(bar.grow(-2.0), CombatStyle.OUTLINE, false, 4.0)
-	y += HP_BAR_H + 12.0
-	y = _pip_rows(font, &"pa", "PA", y)
-	y += 8.0
-	_pip_rows(font, &"pm", "PM", y)
+	if frac > 0.0:
+		var fill: PackedVector2Array = _sector(hp.x * k, hp.y * k, HP_A.x, HP_A.x + (HP_A.y - HP_A.x) * frac)
+		draw_colored_polygon(fill, COLOR_HP.lerp(Color.WHITE, _hp_flash))
+		_outline(fill, CombatStyle.OUTLINE, 3.0)
+	_outline(back, CombatStyle.OUTLINE, 3.0)
+	_draw_number(g, k)
+	_segments(&"pa", COLOR_PA, g, k)
+	_segments(&"pm", COLOR_PM, g, k)
 
 
-## Filas de pips con su etiqueta; devuelve la y donde terminan.
-func _pip_rows(font: Font, kind: StringName, label: String, y: float) -> float:
-	var total: int = pip_count(kind)
-	var lit: int = lit_count(kind)
-	var color: Color = COLOR_PA if kind == &"pa" else COLOR_PM
+func _outline(pts: PackedVector2Array, color: Color, w: float) -> void:
+	var o: PackedVector2Array = pts.duplicate()
+	o.append(pts[0])
+	draw_polyline(o, color, w, true)
+
+
+## Número de PV girado a lo largo del arco (tangente), nunca de cabeza.
+func _draw_number(g: Dictionary, k: float) -> void:
+	var font: Font = CombatStyle.title_font()
+	var fs: int = g.num_size
+	var center: Vector2 = _pt(float(g.num_r) * k, g.num_a)
+	var radial: Vector2 = (center - pivot()).normalized()
+	var tangent: Vector2 = Vector2(-radial.y, radial.x)
+	if tangent.x < 0.0:
+		tangent = -tangent
+	var text: String = str(_hp)
+	var w: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	draw_set_transform_matrix(Transform2D(tangent.angle(), center))
+	var at: Vector2 = Vector2(-w * 0.5, fs * 0.35)
+	draw_string_outline(font, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 6, CombatStyle.OUTLINE)
+	draw_string(font, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
+	draw_set_transform_matrix(Transform2D.IDENTITY)
+
+
+func _segments(kind: StringName, color: Color, g: Dictionary, k: float) -> void:
+	var seg: Vector2 = g.seg
 	var t: Array = _pip_t[kind]
 	var dir: Array = _pip_dir[kind]
-	_text(font, label, Vector2(PAD + 2.0, y + 17.0), LABEL_SIZE - 2, Color(1, 1, 1, 0.75), 4)
-	var x0: float = PAD + LABEL_W + 4.0 + PIP_R
-	var step: float = PIP_R * 2.0 + PIP_GAP
-	for i: int in total:
-		var c: Vector2 = Vector2(x0 + (i % PIP_COLS) * step, y + PIP_R + 1.0 + (i / PIP_COLS) * ROW_PITCH)
+	var lit: int = lit_count(kind)
+	for i: int in pip_count(kind):
+		var a: Vector2 = _seg_angles(kind, i)
 		var anim: float = t[i] if i < t.size() else 0.0
 		var d: float = dir[i] if i < dir.size() else 0.0
-		var filled: bool = i < lit or (anim > 0.0 and d < 0.0)
-		var scale: float = 1.0
-		var fill: Color = color if filled else COLOR_EMPTY
+		var on: bool = i < lit or (anim > 0.0 and d < 0.0)
+		var grow: float = 0.0
+		var fill: Color = color if on else COLOR_OFF
 		if anim > 0.0:
-			# Gastado: crece y se vuelve blanco mientras se apaga. Recuperado: se enciende con destello.
-			scale = 1.0 + (0.5 if d < 0.0 else 0.35) * anim
-			if filled:
+			# Gastado: crece y se vuelve blanco al apagarse. Recuperado: se enciende con destello.
+			grow = (5.0 if d < 0.0 else 3.5) * anim
+			if on:
 				fill = color.lerp(Color.WHITE, anim)
-		_pip(kind, c, PIP_R * scale, fill, color, filled)
-	var rows: int = maxi(ceili(float(total) / PIP_COLS), 1)
-	return y + rows * ROW_PITCH
-
-
-func _pip(kind: StringName, c: Vector2, r: float, fill: Color, edge: Color, filled: bool) -> void:
-	var pts: PackedVector2Array = PackedVector2Array()
-	if kind == &"pa":
-		var n: int = 20
-		for k: int in n:
-			var a: float = TAU * k / n
-			pts.append(c + Vector2(cos(a), sin(a)) * r)
-	else:
-		# Rombo: cuatro vértices sobre los ejes (forma propia de los PM).
-		var rr: float = r * 1.2
-		pts = PackedVector2Array([c + Vector2(0, -rr), c + Vector2(rr, 0), c + Vector2(0, rr), c + Vector2(-rr, 0)])
-	draw_colored_polygon(pts, fill)
-	var outline: PackedVector2Array = pts.duplicate()
-	outline.append(pts[0])
-	# Lleno: borde oscuro. Hueco: borde del color apagado para que se lea el máximo.
-	draw_polyline(outline, CombatStyle.OUTLINE if filled else edge.darkened(0.45), 2.5)
-
-
-func _text(font: Font, text: String, pos: Vector2, font_size: int, color: Color, outline: int) -> void:
-	draw_string_outline(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size, outline, CombatStyle.OUTLINE)
-	draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size, color)
+		var r0: float = seg.x * k - grow
+		var r1: float = seg.y * k + grow
+		var pts: PackedVector2Array = _sector(r0, r1, a.x, a.y)
+		draw_colored_polygon(pts, fill)
+		_outline(pts, CombatStyle.OUTLINE, 2.0)
+		if on:
+			var hl: PackedVector2Array = PackedVector2Array()
+			for s: int in 7:
+				hl.append(_pt(r1 - 3.0, lerpf(a.x + 0.4, a.y - 0.4, float(s) / 6.0)))
+			draw_polyline(hl, color.lightened(0.45), 3.0, true)

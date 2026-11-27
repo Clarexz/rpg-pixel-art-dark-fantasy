@@ -62,7 +62,7 @@ func _run() -> void:
 			_check(_events == [[&"menu", i]], "%s: tocar menu:%d emitió %s" % [tag, i, _events])
 		# Un toque en el hueco entre sectores va a un vecino.
 		var side: float = -1.0 if left else 1.0
-		var gap_pt: Vector2 = pivot + Vector2(-cos(deg_to_rad(230.0)) * -1.0 * side, sin(deg_to_rad(230.0))) * 315.0
+		var gap_pt: Vector2 = pivot + Vector2(-cos(deg_to_rad(225.0)) * -1.0 * side, sin(deg_to_rad(225.0))) * 280.0
 		_events.clear()
 		await _tap(gap_pt)
 		_check(_events.size() == 1 and _events[0][1] in [0, 1], "%s: el hueco entre sectores emitió %s" % [tag, _events])
@@ -82,8 +82,8 @@ func _run() -> void:
 	await _check_hud(ui, host)
 
 
-## El HUD del jugador vive en la esquina libre (lado contrario a la mano) y no
-## toca el arco ni ningún botón en ningún estado del menú.
+## El HUD del jugador: completo (pivote del arco) con el menú, y compacto
+## (cuarto de disco en la esquina contraria) cuando hay cuadrícula, sin cruzar botones.
 func _check_hud(ui: DuelUI, host: Control) -> void:
 	var spells: Array = [
 		{"name": "Trueno", "cost": 4}, {"name": "Egida", "cost": 3}, {"name": "Cura", "cost": 5},
@@ -105,21 +105,26 @@ func _check_hud(ui: DuelUI, host: Control) -> void:
 				"spells": ui.show_spells(spells, 20)
 				"items": ui.show_items(items)
 			await _wait(0.4)
-			var r: Rect2 = hud.get_global_rect()
 			var where: String = "%s/%s" % [tag, state]
 			_check(hud.is_visible_in_tree(), "%s: el HUD no se ve" % where)
-			_check(Rect2(Vector2.ZERO, host.size).encloses(r), "%s: el HUD se sale de la pantalla %s" % [where, r])
-			_check(r.size.x <= 190.0 and r.size.y <= 230.0, "%s: el HUD es muy grande %s" % [where, r.size])
-			# Esquina contraria a la mano, pegada abajo.
-			var on_left: bool = r.get_center().x < host.size.x * 0.5
-			_check(on_left != left, "%s: el HUD no está en la esquina contraria a la mano %s" % [where, r])
-			_check(r.end.y > host.size.y - 40.0, "%s: el HUD no está pegado abajo %s" % [where, r])
-			# Arco: ningún punto del HUD cae dentro del radio exterior (520) del pivote.
+			_check(hud.get_global_rect().encloses(Rect2(Vector2.ZERO, host.size)), "%s: el HUD no cubre la pantalla" % where)
 			var arc: ArcMenu = ui.arc_menu()
-			var pivot: Vector2 = arc.get_global_transform() * arc.pivot()
-			var near: Vector2 = Vector2(clampf(pivot.x, r.position.x, r.end.x), clampf(pivot.y, r.position.y, r.end.y))
-			_check(near.distance_to(pivot) > ArcMenu.RING_OUT[1] + 4.0, "%s: el HUD toca el arco (%.0f px del pivote)" % [where, near.distance_to(pivot)])
-			# Botones visibles: ninguno cruza el HUD.
+			var arc_pivot: Vector2 = arc.get_global_transform() * arc.pivot()
+			var hp: Vector2 = hud.get_global_transform() * hud.pivot()
+			if state == "menu":
+				_check(not hud.compact, "%s: el HUD debería estar en modo completo" % where)
+				_check(hp.is_equal_approx(arc_pivot), "%s: el pivote del HUD %s no coincide con el del arco %s" % [where, hp, arc_pivot])
+				_check(is_equal_approx(hud.dial_radius(), 462.0), "%s: radio del HUD completo %s" % [where, hud.dial_radius()])
+				continue
+			_check(hud.compact, "%s: el HUD debería estar en modo compacto" % where)
+			# Esquina contraria a la mano, pegada abajo.
+			var want_x: float = host.size.x if left else 0.0
+			_check(is_equal_approx(hp.x, 0.0 if not left else host.size.x), "%s: el pivote del HUD no está en la esquina contraria %s" % [where, hp])
+			_check(hp.x != arc_pivot.x and (hp.x == 0.0 or hp.x == host.size.x), "%s: pivote compacto en x=%s (mano en %s)" % [where, hp.x, arc_pivot.x])
+			_check(not is_equal_approx(hp.x, arc_pivot.x), "%s: el HUD compacto está en la esquina de la mano" % where)
+			_check(hp.y > host.size.y - 60.0, "%s: el HUD no está pegado abajo %s" % [where, hp])
+			_check(is_equal_approx(hud.dial_radius(), 214.0), "%s: el radio del cuarto de disco es %s" % [where, hud.dial_radius()])
+			# Botones visibles: el punto más cercano de cada uno al pivote queda fuera del cuarto de disco.
 			var rects: Array[Rect2] = []
 			for key: String in ["back:0", "end:0", "cell:0", "cell:1", "cell:2", "cell:3", "cell:4", "cell:5",
 					"spell:0", "spell:1", "spell:2", "spell:3", "spell:4", "item:0", "item:1", "item:2", "item:3"]:
@@ -127,9 +132,15 @@ func _check_hud(ui: DuelUI, host: Control) -> void:
 				if b != null and b.is_visible_in_tree():
 					rects.append(b.get_global_rect())
 			for br: Rect2 in rects:
-				_check(not r.intersects(br), "%s: el HUD cruza un botón %s" % [where, br])
-			if state in ["grid", "grid_util", "spells", "items"]:
-				_check(rects.size() >= 2, "%s: no se encontraron botones para comparar" % where)
+				var near: Vector2 = Vector2(clampf(hp.x, br.position.x, br.end.x), clampf(hp.y, br.position.y, br.end.y))
+				_check(near.distance_to(hp) > 214.0, "%s: el HUD compacto cruza un botón %s (a %.0f px)" % [where, br, near.distance_to(hp)])
+			_check(rects.size() >= 2, "%s: no se encontraron botones para comparar" % where)
+			# Los segmentos caen dentro de x 0..214 (o el espejo) y de la pantalla.
+			var seg: Rect2 = hud.segment_rect_global(&"pa", 0)
+			_check(Rect2(Vector2.ZERO, host.size).encloses(seg), "%s: el segmento de PA se sale de la pantalla %s" % [where, seg])
+			var limit_ok: bool = seg.end.x <= 214.0 if not left else seg.position.x >= host.size.x - 214.0
+			_check(limit_ok, "%s: el segmento de PA pasa de 214 px %s" % [where, seg])
+			_check(want_x == hp.x, "%s: pivote compacto en x=%s, debía ser %s" % [where, hp.x, want_x])
 	# 9 PA máximos con 3 llenos: 9 pips, 3 encendidos.
 	ui.left_handed = false
 	ui.apply_hand()

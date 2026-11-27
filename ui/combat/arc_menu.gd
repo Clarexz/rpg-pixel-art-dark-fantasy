@@ -12,8 +12,8 @@ extends Control
 signal pressed(index: int)
 
 ## Radios de cada anillo (0 = interior, el más usado; 1 = exterior).
-const RING_IN: Array[float] = [230.0, 410.0]
-const RING_OUT: Array[float] = [400.0, 520.0]
+const RING_IN: Array[float] = [220.0, 370.0]
+const RING_OUT: Array[float] = [340.0, 450.0]
 ## Cuánto aguantan los toques fuera del sector (px): los huecos van al vecino.
 const HIT_TOLERANCE: float = 16.0
 const OUTLINE_W: float = 4.0
@@ -157,7 +157,7 @@ func _set_show(value: float, ring: int) -> void:
 
 ## Escala los radios si la pantalla es más angosta que 720.
 func _scale() -> float:
-	return clampf(size.x / 720.0, 0.6, 1.0)
+	return ArcMenu.scale_for(size.x)
 
 
 func _mid_radius(e: Dictionary) -> float:
@@ -166,9 +166,20 @@ func _mid_radius(e: Dictionary) -> float:
 
 
 func _polar(p: Vector2, r: float, deg: float) -> Vector2:
+	return ArcMenu.polar(p, r, deg, left_handed)
+
+
+## Punto a distancia r y ángulo deg (grados, 180 = izquierda, 270 = arriba)
+## de p; en zurdo se espeja en horizontal. Lo comparte el HUD del jugador.
+static func polar(p: Vector2, r: float, deg: float, mirrored: bool) -> Vector2:
 	var a: float = deg_to_rad(deg)
 	var dx: float = cos(a) * r
-	return p + Vector2(-dx if left_handed else dx, sin(a) * r)
+	return p + Vector2(-dx if mirrored else dx, sin(a) * r)
+
+
+## Escala de los radios para un ancho de pantalla dado.
+static func scale_for(width: float) -> float:
+	return clampf(width / 720.0, 0.6, 1.0)
 
 
 ## Polígono del sector, encogido `inset` px por todos los lados.
