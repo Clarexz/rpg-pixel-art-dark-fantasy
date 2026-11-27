@@ -80,6 +80,7 @@ func _run() -> void:
 	var cell_box: StyleBoxFlat = ui.button_for(&"cell", 0).get_theme_stylebox("normal") as StyleBoxFlat
 	_check(cell_box.skew == Vector2.ZERO, "las celdas no deberían estar inclinadas")
 	await _check_hud(ui, host)
+	await _check_rival(ui, host)
 
 
 ## El HUD del jugador: completo (pivote del arco) con el menú, y compacto
@@ -153,6 +154,73 @@ func _check_hud(ui: DuelUI, host: Control) -> void:
 	await _wait(0.5)  # las animaciones de gasto/destello terminan solas
 	_check(ui.player_hud().lit_count(&"pa") == 1, "el HUD no bajó los PA")
 	_check(not ui.player_hud().is_processing(), "el HUD sigue animando de más")
+
+
+## La zona del rival: dial en la esquina de arriba contraria a la mano, vida,
+## nombre ajustado al arco y globo de diálogo.
+func _check_rival(ui: DuelUI, host: Control) -> void:
+	for left: bool in [false, true]:
+		ui.left_handed = left
+		ui.apply_hand()
+		var tag: String = "zurdo" if left else "diestro"
+		var dial: RivalDial = ui.rival_dial()
+		await _wait(0.1)
+		var p: Vector2 = dial.get_global_transform() * dial.pivot()
+		_check(is_equal_approx(p.x, host.size.x if left else 0.0), "%s: el dial del rival no está en la esquina contraria %s" % [tag, p])
+		_check(p.y >= 0.0 and p.y <= 16.0, "%s: el dial del rival no está arriba %s" % [tag, p])
+		_check(dial.get_global_rect().encloses(Rect2(Vector2.ZERO, host.size)), "%s: el dial no cubre la pantalla" % tag)
+		var arc_pivot: Vector2 = ui.arc_menu().get_global_transform() * ui.arc_menu().pivot()
+		_check(not is_equal_approx(p.x, arc_pivot.x), "%s: el dial del rival está del lado de la mano" % tag)
+	ui.left_handed = false
+	ui.apply_hand()
+	var d: RivalDial = ui.rival_dial()
+	ui.set_rival("Lobo", 30, 40)
+	_check(d.hp_value() == 30 and d.max_hp_value() == 40, "set_rival no actualizó la vida")
+	ui.set_rival("Lobo", 12, 40)
+	_check(d.hp_value() == 12, "set_rival no bajó la vida")
+	await _wait(0.5)
+	_check(not d.is_processing(), "el dial sigue animando de más")
+	# Nombre: corto = 1 renglón; largo = 2; absurdo = recortado con "…".
+	_check(d.name_lines() == PackedStringArray(["LOBO"]), "nombre corto: %s" % d.name_lines())
+	_check(d.name_font_size() == 24, "nombre corto debería ir a 24, va a %d" % d.name_font_size())
+	ui.set_rival("Lobo de ceniza", 12, 40)
+	_check(d.name_lines().size() == 1 and d.name_font_size() >= 16, "'Lobo de ceniza': %s a %d" % [d.name_lines(), d.name_font_size()])
+	ui.set_rival("Penitente de hierro de la mina vieja", 12, 40)
+	_check(d.name_lines().size() == 2, "nombre largo debería ir en 2 renglones: %s" % d.name_lines())
+	_check(not d.name_lines()[0].ends_with("…") and not d.name_lines()[1].ends_with("…"), "nombre largo no debería recortarse: %s" % d.name_lines())
+	var absurd: String = ""
+	for i: int in 12:
+		absurd += "Abcde "
+	ui.set_rival(absurd.strip_edges().substr(0, 60), 12, 40)
+	_check(d.name_lines().size() <= 2 and d.name_lines()[d.name_lines().size() - 1].ends_with("…"), "nombre absurdo debería recortarse: %s" % d.name_lines())
+	ui.set_rival("Lobo de ceniza", 12, 40)
+	# Globo: quita el nombre y las comillas; la lectura va al dial.
+	ui.say("Lobo de ceniza: \"Hola\"\n◆ Piedra: fuerte.")
+	_check(ui.speech_text() == "Hola", "el globo dice '%s'" % ui.speech_text())
+	_check(d.reading_text == "◆ Piedra: fuerte.", "la lectura del dial: '%s'" % d.reading_text)
+	_check(ui._bubble.visible, "el globo debería verse")
+	var box: Rect2 = ui._bubble.box_rect()
+	_check(absf(box.get_center().x - host.size.x * 0.5) < 1.0, "el globo no está centrado %s" % box)
+	_check(box.position.y >= d.dial_radius(), "el globo tapa el dial %s" % box)
+	ui.say("◆ Piedra: sola.")
+	_check(ui.speech_text() == "" and not ui._bubble.visible, "una lectura sola no debería dejar globo")
+	ui.say("Eco sin prefijo")
+	_check(ui.speech_text() == "Eco sin prefijo", "sin prefijo: '%s'" % ui.speech_text())
+	ui.say("")
+	_check(not ui._bubble.visible and ui.speech_text() == "", "say('') debería ocultar el globo")
+	ui.status("Cargando…")
+	_check(d.status_text == "Cargando…", "el estado no llegó al dial")
+	ui.status("")
+	# El aviso queda a la derecha del dial (diestro) y a la izquierda (zurdo).
+	ui.prompt("Elige qué hacer")
+	for left: bool in [false, true]:
+		ui.left_handed = left
+		ui.apply_hand()
+		var pr: Rect2 = ui._prompt.get_global_rect()
+		var dial_rect: Rect2 = Rect2(0.0 if not left else host.size.x - d.dial_radius(), 0.0, d.dial_radius(), d.dial_radius() + 8.0)
+		_check(not pr.intersects(dial_rect), "%s: el aviso choca con el dial %s" % ["zurdo" if left else "diestro", pr])
+	ui.left_handed = false
+	ui.apply_hand()
 
 
 ## Toca un punto global (como el pulgar): ScreenTouch abajo y arriba.

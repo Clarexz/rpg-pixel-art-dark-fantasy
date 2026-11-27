@@ -3,11 +3,10 @@ extends Control
 ## Pantalla del duelo, pensada para UN pulgar en vertical:
 ##
 ##   ┌───────────────────┐
-##   │ Lobo   [████░░]   │  arriba: enemigo y lo que dice (solo se lee)
-##   │ "La última vez…"  │
-##   │                   │
+##   │◜LOBO◝ ¡aviso!     │  arriba: dial del rival (esquina contraria a la mano)
+##   │ Cargando…         │  y el aviso de turno a su lado
+##   │  ( "La última…" ) │  globo con lo que dice el rival
 ##   │   (!)   ◯→        │  centro: el rival y la flecha + aro de su ataque
-##   │ ¡aviso de turno!  │  una línea de aviso bajo el rival
 ##   │                   │
 ##   │        [Volver][Fin]│
 ##   │ PV 100 [Bloq][Bloq][Bloq]│  la cuadrícula 2x3 (o el arco) pegada a la
@@ -51,10 +50,9 @@ const SWAP_LOCK_MS: int = 150
 
 var left_handed: bool = false
 
-var _rival_name: Label
-var _rival_bar: ProgressBar
-var _status: Label
-var _dialog: Label
+var _rival_name: String = ""
+var _dial: RivalDial
+var _bubble: SpeechBubble
 var _prompt: Label
 var _hud: PlayerHud
 var _song: SongDisplay
@@ -83,9 +81,8 @@ func _ready() -> void:
 # --- API que usa Duel -------------------------------------------------------
 
 func set_rival(rival_name: String, hp: int, max_hp: int) -> void:
-	_rival_name.text = rival_name
-	_rival_bar.max_value = max_hp
-	_rival_bar.value = hp
+	_rival_name = rival_name
+	_dial.set_rival(rival_name, hp, max_hp)
 
 
 func set_stats(hp: int, max_hp: int, pa: int, max_pa: int, pm: int, max_pm: int) -> void:
@@ -99,16 +96,44 @@ func player_hud() -> PlayerHud:
 
 ## Estado del enemigo debajo de su barra (p. ej. "Cargando..."). "" = nada.
 func status(text: String) -> void:
-	_status.text = text
-	_status.visible = not text.is_empty()
+	_dial.status_text = text
 
 
+## Separa lo que dice el rival (globo) de la lectura de la piedra (líneas con
+## "◆", que van al dial). Al globo no se le pone "Nombre: " ni las comillas.
 func say(text: String) -> void:
-	_dialog.text = text
+	var spoken: PackedStringArray = PackedStringArray()
+	var reading: PackedStringArray = PackedStringArray()
+	for line: String in text.split("\n"):
+		var l: String = line.strip_edges()
+		if l.begins_with("◆"):
+			reading.append(l)
+		elif not l.is_empty():
+			spoken.append(l)
+	var msg: String = "\n".join(spoken)
+	var prefix: String = _rival_name + ": "
+	if not _rival_name.is_empty() and msg.begins_with(prefix):
+		msg = msg.substr(prefix.length()).strip_edges()
+		for pair: String in ["\"\"", "“”", "«»"]:
+			if msg.length() >= 2 and msg.begins_with(pair[0]) and msg.ends_with(pair[1]):
+				msg = msg.substr(1, msg.length() - 2).strip_edges()
+				break
+	_dial.reading_text = "\n".join(reading)
+	_bubble.top_y = _dial.bubble_top()
+	_bubble.say(msg)
 
 
 func prompt(text: String) -> void:
 	_prompt.text = text
+
+
+## Para las pruebas: el dial del rival y el texto del globo.
+func rival_dial() -> RivalDial:
+	return _dial
+
+
+func speech_text() -> String:
+	return _bubble.text()
 
 
 ## Menú principal del turno: 4 sectores en arco alrededor de la base del pulgar
@@ -277,30 +302,7 @@ func _build() -> void:
 	root.add_theme_constant_override("separation", 10)
 	add_child(root)
 
-	# Arriba: rival.
-	var top: PanelContainer = PanelContainer.new()
-	top.add_theme_stylebox_override("panel", _box(Color(0, 0, 0, 0.55), 14))
-	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(top)
-	var top_box: VBoxContainer = VBoxContainer.new()
-	top.add_child(top_box)
-	_rival_name = Label.new()
-	CombatStyle.style_title_label(_rival_name, 34, 8)
-	top_box.add_child(_rival_name)
-	_rival_bar = _bar(Color(0.75, 0.2, 0.25), 22)
-	top_box.add_child(_rival_bar)
-	_status = Label.new()
-	_status.add_theme_color_override("font_color", Color(1, 0.85, 0.3))
-	_status.add_theme_font_size_override("font_size", 28)
-	_status.hide()
-	top_box.add_child(_status)
-	_dialog = Label.new()
-	_dialog.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_dialog.add_theme_color_override("font_color", Color(1, 0.88, 0.6))
-	_dialog.add_theme_font_size_override("font_size", 28)
-	top_box.add_child(_dialog)
-
-	# Aviso de una línea bajo el rival (el HUD de abajo es muy angosto para texto).
+	# Aviso de una línea arriba, junto al dial del rival (ver _layout_top).
 	_prompt = Label.new()
 	_prompt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -308,7 +310,6 @@ func _build() -> void:
 	_prompt.add_theme_font_size_override("font_size", 24)
 	_prompt.add_theme_color_override("font_outline_color", CombatStyle.OUTLINE)
 	_prompt.add_theme_constant_override("outline_size", 8)
-	root.add_child(_prompt)
 
 	var spacer: Control = Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -346,6 +347,14 @@ func _build() -> void:
 	bottom_pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(bottom_pad)
 
+	# Rival: dial en la esquina de arriba contraria a la mano, globo y aviso.
+	_dial = RivalDial.new()
+	add_child(_dial)
+	_bubble = SpeechBubble.new()
+	add_child(_bubble)
+	add_child(_prompt)
+	resized.connect(_layout_top)
+
 	# Tus PV/PA/PM: dibujados bajo el arco (ver PlayerHud).
 	_hud = PlayerHud.new()
 	add_child(_hud)
@@ -368,6 +377,8 @@ func _build() -> void:
 func apply_hand() -> void:
 	_arc.left_handed = left_handed
 	_hud.left_handed = left_handed
+	_dial.left_handed = left_handed
+	_layout_top()
 	for row: HBoxContainer in [_util_row, _cluster_row]:
 		for child: Node in row.get_children():
 			row.remove_child(child)
@@ -375,6 +386,21 @@ func apply_hand() -> void:
 	_pack(_util_row, util_items)
 	var cluster_items: Array[Control] = [_cluster]
 	_pack(_cluster_row, cluster_items)
+
+
+## El aviso va arriba, del lado de la mano y a la derecha del dial (zurdo:
+## espejado), alineado con el borde de arriba del dial. El globo va bajo el dial.
+## DuelUI ya vive dentro de la zona segura (SafeArea en duel.tscn), así que el
+## margen superior es solo RivalDial.TOP_MARGIN.
+func _layout_top() -> void:
+	if _dial == null:
+		return
+	var edge: float = _dial.dial_radius() + 14.0
+	var x0: float = 16.0 if left_handed else edge
+	var x1: float = size.x - edge if left_handed else size.x - 16.0
+	_prompt.position = Vector2(x0, RivalDial.TOP_MARGIN)
+	_prompt.size = Vector2(maxf(x1 - x0, 0.0), 0.0)
+	_bubble.top_y = _dial.bubble_top()
 
 
 func _pack(row: HBoxContainer, items: Array[Control]) -> void:
@@ -442,30 +468,3 @@ func _make_button(text: String, color: Color, min_size: Vector2) -> Button:
 	b.focus_mode = Control.FOCUS_NONE
 	CombatStyle.style_button(b, color, 26, false)
 	return b
-
-
-func _box(color: Color, radius: int) -> StyleBoxFlat:
-	var s: StyleBoxFlat = StyleBoxFlat.new()
-	s.bg_color = color
-	s.set_corner_radius_all(radius)
-	s.set_content_margin_all(10)
-	s.border_color = Color(1, 1, 1, 0.25)
-	s.set_border_width_all(2)
-	return s
-
-
-func _bar(color: Color, height: float) -> ProgressBar:
-	var bar: ProgressBar = ProgressBar.new()
-	bar.show_percentage = false
-	bar.custom_minimum_size = Vector2(0, height)
-	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	var fill: StyleBoxFlat = StyleBoxFlat.new()
-	fill.bg_color = color
-	fill.set_corner_radius_all(6)
-	var bg: StyleBoxFlat = StyleBoxFlat.new()
-	bg.bg_color = Color(0.1, 0.08, 0.12)
-	bg.set_corner_radius_all(6)
-	bar.add_theme_stylebox_override("fill", fill)
-	bar.add_theme_stylebox_override("background", bg)
-	return bar
