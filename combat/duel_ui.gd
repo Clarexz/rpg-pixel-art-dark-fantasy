@@ -27,10 +27,26 @@ const CELL_TEXT: Array[String] = [
 	"Bloquear\n< Izq", "Bloquear\nCentro", "Bloquear\nDer >",
 	"Atacar\n< Izq", "Atacar\nCentro", "Atacar\nDer >",
 ]
-const COLOR_GUARD: Color = Color(0.25, 0.42, 0.7)
-const COLOR_ATTACK: Color = Color(0.7, 0.22, 0.2)
-const COLOR_NEUTRAL: Color = Color(0.32, 0.28, 0.4)
-const COLOR_MENU: Color = Color(0.3, 0.24, 0.36)
+const COLOR_GUARD: Color = CombatStyle.GUARD
+const COLOR_ATTACK: Color = CombatStyle.ATTACK
+const COLOR_NEUTRAL: Color = CombatStyle.NEUTRAL
+const COLOR_MENU: Color = CombatStyle.ITEMS
+## Abanico del menú del turno: [etiqueta, color, ancho, alto], de abajo (0)
+## hacia arriba (3). El tamaño es la importancia.
+const FAN: Array[Dictionary] = [
+	{"label": "CUERPO A\nCUERPO", "color": CombatStyle.ATTACK, "w": 320.0, "h": 108.0},
+	{"label": "HECHIZOS", "color": CombatStyle.SPELL, "w": 270.0, "h": 88.0},
+	{"label": "ITEMS", "color": CombatStyle.ITEMS, "w": 215.0, "h": 74.0},
+	{"label": "HUIR", "color": CombatStyle.FLEE, "w": 170.0, "h": 62.0},
+]
+## Margen en la orilla de la mano para que la inclinación no se recorte.
+const HAND_MARGIN: float = 22.0
+const FAN_GAP: float = 12.0
+const FAN_MARGIN: float = 20.0
+const FAN_BOTTOM: float = 24.0
+const FAN_SLIDE: Vector2 = Vector2(80, 40)
+const FAN_TIME: float = 0.18
+const FAN_STAGGER: float = 0.04
 const CLUSTER_W: float = 480.0
 const CELL_H: float = 124.0
 const GAP: float = 10.0
@@ -57,6 +73,7 @@ var _back_button: Button
 var _end_button: Button
 var _cluster_row: HBoxContainer
 var _cluster: GridContainer
+var _fan: Control
 var _telegraph: TelegraphView
 var _flash: ColorRect
 var _banner: Label
@@ -107,16 +124,89 @@ func prompt(text: String) -> void:
 	_prompt.text = text
 
 
-## Menú principal del turno: 4 botones grandes en 2x2.
+## Menú principal del turno: 4 botones inclinados en abanico diagonal, el más
+## grande abajo y pegado a la orilla de tu mano.
 ## flee_hint = qué tan fácil es huir según tu piedra ("fácil", "difícil"...).
 func show_menu(flee_hint: String = "") -> void:
 	_set_util(false, false)
-	_fill(2, [
-		_def("Cuerpo a\ncuerpo", &"menu", 0, COLOR_ATTACK),
-		_def("Hechizos", &"menu", 1, COLOR_GUARD),
-		_def("Items", &"menu", 2, COLOR_MENU),
-		_def("Huir" if flee_hint.is_empty() else "Huir\n(%s)" % flee_hint, &"menu", 3, COLOR_NEUTRAL),
-	])
+	_fill(3, [])
+	_cluster_row.custom_minimum_size.y = _fan_height()
+	var skew: float = CombatStyle.skew_for(left_handed)
+	for i: int in FAN.size():
+		var d: Dictionary = FAN[i]
+		var b: Button = Button.new()
+		b.text = d.label
+		if i == 3 and not flee_hint.is_empty():
+			b.text = "HUIR\n(%s)" % flee_hint
+		var h: float = d.h
+		b.size = Vector2(d.w, h)
+		b.focus_mode = Control.FOCUS_NONE
+		var fs: int = roundi(h * 0.32)
+		if i == 3 and not flee_hint.is_empty():
+			fs = roundi(h * 0.27)
+		CombatStyle.style_button(b, d.color, fs, true, skew)
+		b.add_theme_constant_override("outline_size", 5)
+		# Márgenes verticales mínimos para que el texto no estire el botón.
+		for state: String in ["normal", "hover", "pressed", "disabled"]:
+			var box: StyleBoxFlat = b.get_theme_stylebox(state) as StyleBoxFlat
+			box.content_margin_top = 0.0
+			box.content_margin_bottom = 0.0
+		b.button_down.connect(_emit.bind(&"menu", i))
+		_fan.add_child(b)
+		_buttons["menu:%d" % i] = b
+	_layout_fan(true)
+
+
+## Alto total de la pila del abanico.
+func _fan_height() -> float:
+	var total: float = FAN_BOTTOM
+	for d: Dictionary in FAN:
+		total += float(d.h) + FAN_GAP
+	return total - FAN_GAP
+
+
+## Coloca los botones del abanico (escalonados a lo largo de la inclinación).
+## animate = entran deslizándose desde la orilla de la mano.
+func _layout_fan(animate: bool) -> void:
+	var buttons: Array[Button] = []
+	for child: Node in _fan.get_children():
+		if not child.is_queued_for_deletion():
+			buttons.append(child as Button)
+	if buttons.size() != FAN.size():
+		return
+	# Desplazamiento a lo largo de la diagonal: la distancia vertical entre
+	# centros por la inclinación (la pila se lee como un solo paralelogramo).
+	var shifts: Array[float] = []
+	var y_centers: Array[float] = []
+	var y: float = size.y - FAN_BOTTOM
+	for i: int in buttons.size():
+		var h: float = buttons[i].size.y
+		y -= h
+		y_centers.append(y + h * 0.5)
+		y -= FAN_GAP
+	for i: int in buttons.size():
+		shifts.append((y_centers[0] - y_centers[i]) * CombatStyle.SKEW)
+	# Lo que sobresale la caja del botón de abajo por la inclinación (la mitad
+	# del alto por SKEW): se descuenta del margen para no recortar nada.
+	var overhang: float = buttons[0].size.y * CombatStyle.SKEW * 0.5
+	var side: float = -1.0 if left_handed else 1.0
+	for i: int in buttons.size():
+		var b: Button = buttons[i]
+		# Borde del lado de la mano: cada botón de arriba se corre hacia el
+		# centro de la pantalla, siguiendo la diagonal.
+		var edge: float = size.x - FAN_MARGIN - overhang - shifts[i]
+		var x: float = edge - b.size.x
+		if left_handed:
+			x = size.x - edge
+		b.position = Vector2(x, y_centers[i] - b.size.y * 0.5)
+		if animate:
+			var final_pos: Vector2 = b.position
+			b.position = final_pos + FAN_SLIDE * Vector2(side, 1.0)
+			b.modulate.a = 0.0
+			var tween: Tween = b.create_tween().set_parallel()
+			tween.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+			tween.tween_property(b, "position", final_pos, FAN_TIME).set_delay(FAN_STAGGER * i)
+			tween.tween_property(b, "modulate:a", 1.0, FAN_TIME).set_delay(FAN_STAGGER * i)
 
 
 ## La cuadrícula 2x3. neutral = colores iguales (para tocar canciones).
@@ -264,7 +354,7 @@ func _build() -> void:
 	var top_box: VBoxContainer = VBoxContainer.new()
 	top.add_child(top_box)
 	_rival_name = Label.new()
-	_rival_name.add_theme_font_size_override("font_size", 30)
+	CombatStyle.style_title_label(_rival_name, 34, 8)
 	top_box.add_child(_rival_name)
 	_rival_bar = _bar(Color(0.75, 0.2, 0.25), 22)
 	top_box.add_child(_rival_bar)
@@ -286,9 +376,7 @@ func _build() -> void:
 
 	_banner = Label.new()
 	_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_banner.add_theme_font_size_override("font_size", 64)
-	_banner.add_theme_color_override("font_outline_color", Color.BLACK)
-	_banner.add_theme_constant_override("outline_size", 14)
+	CombatStyle.style_title_label(_banner, 64, 14)
 	_banner.hide()
 	root.add_child(_banner)
 
@@ -339,6 +427,13 @@ func _build() -> void:
 	bottom_pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(bottom_pad)
 
+	# Abanico del menú: encima de todo salvo el destello.
+	_fan = Control.new()
+	_fan.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_fan.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_fan)
+	resized.connect(_layout_fan.bind(false))
+
 	_flash = ColorRect.new()
 	_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -362,12 +457,19 @@ func _pack(row: HBoxContainer, items: Array[Control]) -> void:
 	var spacer: Control = Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var margin: Control = Control.new()
+	margin.custom_minimum_size = Vector2(HAND_MARGIN, 0)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if not left_handed:
 		row.add_child(spacer)
+	else:
+		row.add_child(margin)
 	for item: Control in items:
 		row.add_child(item)
 	if left_handed:
 		row.add_child(spacer)
+	else:
+		row.add_child(margin)
 
 
 func _def(text: String, kind: StringName, value: int, color: Color) -> Dictionary:
@@ -378,6 +480,9 @@ func _fill(columns: int, defs: Array[Dictionary]) -> void:
 	for child: Node in _cluster.get_children():
 		child.queue_free()
 	_buttons.clear()
+	for child: Node in _fan.get_children():
+		child.queue_free()
+	_cluster_row.custom_minimum_size.y = 0.0
 	_buttons["back:0"] = _back_button
 	_buttons["end:0"] = _end_button
 	_cluster.columns = columns
@@ -408,12 +513,7 @@ func _make_button(text: String, color: Color, min_size: Vector2) -> Button:
 	b.text = text
 	b.custom_minimum_size = min_size
 	b.focus_mode = Control.FOCUS_NONE
-	b.add_theme_font_size_override("font_size", 26)
-	b.add_theme_stylebox_override("normal", _box(color, 14))
-	b.add_theme_stylebox_override("hover", _box(color, 14))
-	b.add_theme_stylebox_override("pressed", _box(color.lightened(0.35), 14))
-	b.add_theme_stylebox_override("disabled", _box(color.darkened(0.6), 14))
-	b.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.3))
+	CombatStyle.style_button(b, color, 26, false, CombatStyle.skew_for(left_handed))
 	return b
 
 
