@@ -14,8 +14,12 @@ extends Control
 ## Ángulos como en ArcMenu (diestro: 180 = izquierda, 270 = arriba; zurdo espeja).
 
 const BOTTOM_MARGIN: float = 24.0
+## Radio de la base cuando está la franja de Terminar turno.
+const STRIP_R: float = 506.0
 ## Radio del cuarto de disco del modo compacto.
 const COMPACT_R: float = 214.0
+## Centro del número de PV respecto al pivote (diestro; zurdo espeja x).
+const NUM_OFFSET: Vector2 = Vector2(-146.0, -34.0)
 const STEP_DEG: float = 3.0
 const SEG_GAP_DEG: float = 1.6
 
@@ -44,6 +48,14 @@ var compact: bool = false:
 			return
 		compact = value
 		_fade_in()
+		queue_redraw()
+
+## Franja exterior (Terminar turno) visible: la base de piedra llega hasta r 506.
+var strip: bool = false:
+	set(value):
+		if value == strip:
+			return
+		strip = value
 		queue_redraw()
 
 var _hp: int = 0
@@ -89,7 +101,12 @@ func pivot() -> Vector2:
 
 ## Radio exterior de la base (para las pruebas): lo que ocupa el HUD desde su pivote.
 func dial_radius() -> float:
-	return (COMPACT_R if compact else 462.0) * _scale()
+	return (COMPACT_R if compact else _full_r()) * _scale()
+
+
+## Radio exterior de la base en modo completo (sin escalar).
+func _full_r() -> float:
+	return STRIP_R if strip else 462.0
 
 
 ## Geometría del modo actual (radios sin escalar).
@@ -98,9 +115,9 @@ func _geo() -> Dictionary:
 		return {"base": Vector2(0.0, COMPACT_R), "base_a": Vector2(180.0, 270.0),
 				"hp": Vector2(150.0, 170.0), "seg": Vector2(112.0, 132.0),
 				"num_r": 62.0, "num_a": 225.0, "num_size": 32}
-	return {"base": Vector2(170.0, 462.0), "base_a": Vector2(179.0, 271.0),
+	return {"base": Vector2(170.0, _full_r()), "base_a": Vector2(179.0, 271.0),
 			"hp": Vector2(184.0, 208.0), "seg": Vector2(344.0, 366.0),
-			"num_r": 154.0, "num_a": 186.0, "num_size": 30}
+			"num_r": 154.0, "num_a": 186.0, "num_size": 28}
 
 
 func _pt(r: float, deg: float) -> Vector2:
@@ -275,9 +292,9 @@ func _outline(pts: PackedVector2Array, color: Color, w: float) -> void:
 	draw_polyline(o, color, w, true)
 
 
-## Rectángulo (local) del número de PV, recto (sin girar). Completo: junto al
-## extremo de abajo de la barra, por dentro de la curva y con la base sobre el
-## margen inferior. Compacto: centrado en el cuarto de disco.
+## Rectángulo (local) del número de PV, recto (sin girar). Completo: entre el
+## botón central (r 118) y la barra de PV (r 184), cerca de la base (siempre en
+## el mismo sitio, también con el menú). Compacto: centrado en el cuarto de disco.
 func number_rect() -> Rect2:
 	var g: Dictionary = _geo()
 	var k: float = _scale()
@@ -288,12 +305,9 @@ func number_rect() -> Rect2:
 	if compact:
 		var c: Vector2 = _pt(float(g.num_r) * k, g.num_a)
 		return Rect2(c - Vector2(w, h) * 0.5, Vector2(w, h))
-	# Por dentro de la barra (radio interior de PV), a 10 px de ella.
-	var hp: Vector2 = g.hp
-	var reach: float = hp.x * k - 10.0
-	var x: float = pivot().x + reach - w if _mirrored() else pivot().x - reach
-	var y: float = pivot().y - 2.0 - font.get_ascent(fs)
-	return Rect2(Vector2(x, y), Vector2(w, h))
+	# Entre el botón central (r 118) y la barra de PV (r 184), cerca de la base.
+	var c: Vector2 = pivot() + Vector2(NUM_OFFSET.x * k * (-1.0 if _mirrored() else 1.0), NUM_OFFSET.y * k)
+	return Rect2(c - Vector2(w, h) * 0.5, Vector2(w, h))
 
 
 ## Número de PV, horizontal (nunca girado).

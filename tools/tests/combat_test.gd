@@ -211,7 +211,7 @@ func test_wolf_feint() -> void:
 	var wait: float = _duel.impact_at - 0.1 - Time.get_ticks_usec() / 1_000_000.0
 	if wait > 0.0:
 		await _seconds(wait)
-	await _tap(_ui.button_for(&"cell", _duel.telegraph_side), 0.0)
+	await _tap(_ui.point_for(&"cell", _duel.telegraph_side), 0.0)
 	await _until(func() -> bool: return _duel.phase == &"menu", 6.0)
 	_check(_duel.stats.perfect == 1, "no se pudo bloquear perfecto la finta (%s)" % _duel.stats)
 	var registry: RivalRegistry = _world.get("_rivals")
@@ -232,9 +232,9 @@ func _total(inv: Inventory) -> int:
 func _end_turn_with_one_hit() -> void:
 	await _tap(_ui.menu_point(0))
 	await _until(func() -> bool: return _duel.phase == &"melee", 2.0)
-	await _tap(_ui.button_for(&"cell", 4))
+	await _tap(_ui.point_for(&"cell", 4))
 	await _until(func() -> bool: return _duel.phase == &"melee", 3.0)
-	await _tap(_ui.button_for(&"end", 0))
+	await _tap(_ui.point_for(&"end", 0))
 
 
 func _cast(index: int) -> void:
@@ -244,7 +244,7 @@ func _cast(index: int) -> void:
 	for note: int in Duel.SPELLS[index].song:
 		await _until(func() -> bool: return _duel.phase == &"song", 2.0)
 		await _seconds(0.15)
-		await _tap(_ui.button_for(&"cell", note))
+		await _tap(_ui.point_for(&"cell", note))
 	await _until(func() -> bool: return _duel.phase != &"song" and _duel.phase != &"busy", 4.0)
 
 
@@ -253,7 +253,7 @@ func _finish_win(enemy: Enemy) -> void:
 	enemy.hp = 1
 	await _tap(_ui.menu_point(0))
 	await _until(func() -> bool: return _duel.phase == &"melee", 2.0)
-	await _tap(_ui.button_for(&"cell", 3))
+	await _tap(_ui.point_for(&"cell", 3))
 	await _until(func() -> bool: return not _duel.is_active(), 10.0)
 
 

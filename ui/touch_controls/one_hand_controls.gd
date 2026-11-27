@@ -7,7 +7,7 @@ extends Control
 ##   │      (+)      │   arriba: nada (la mano no llega cómoda)
 ##   │          [PI] │
 ##   │          [AT] │   botones del lado de la mano (zurdo = a la izquierda)
-##   │   ( stick )   │   abajo: pon el pulgar donde sea y arrastra
+##   │   ( stick )   │   abajo: stick fijo; toca en la zona y arrastra
 ##   └───────────────┘
 ##
 ## Dos modos (se eligen en Ajustes para comparar):
@@ -33,10 +33,9 @@ var grid_mode: bool = false
 
 var _finger: int = -1
 var _center: Vector2 = Vector2.ZERO
-## Ancla del conjunto stick + botones (coordenadas globales). Se mueve al
-## tocar la zona del stick y ahí se queda al soltar.
+## Ancla del conjunto stick + botones (coordenadas globales). Es fija: siempre
+## queda en la posición de reposo (ajustada para que todo quepa en pantalla).
 var _anchor: Vector2 = Vector2.ZERO
-var _anchor_set: bool = false  # true cuando el jugador ya movió el ancla con un toque
 var _knob: Vector2 = Vector2.ZERO
 var _sprinting: bool = false
 var _held_dir: Vector2i = Vector2i.ZERO
@@ -71,6 +70,10 @@ const STICK_KNOB_TEX: Texture2D = preload("res://assets/ui/controls/stick_knob.p
 const ATTACK_LIFT: float = 0.0  # centrado con el stick (pedido de Caleb)
 ## Espacio plano entre el cuadrado de ataque y la media luna de la piedra.
 const STONE_GAP: float = 14.0
+## Posición de reposo del stick (a escala 1): separación del centro del stick
+## al borde del lado de la mano y al borde inferior, descontando el radio.
+const REST_SIDE_GAP: float = 204.0
+const REST_BOTTOM_GAP: float = 267.0
 
 
 ## Radio del stick ya escalado (el modo una mano ignora joystick_radius).
@@ -124,8 +127,8 @@ func _layout() -> void:
 		return
 	_attack_button.visual_scale = settings.controls_scale
 	_scan_button.visual_scale = settings.controls_scale
-	# Sin toques del jugador el ancla es el reposo de siempre; si ya se movió, solo se reajusta.
-	_anchor = _clamp_anchor(_anchor if _anchor_set else _rest_center())
+	# El ancla es fija: siempre el reposo, ajustado para que el conjunto quepa.
+	_anchor = _clamp_anchor(_rest_center())
 	if _finger == -1:
 		_center = _anchor
 	var rects: Array[Rect2] = _cluster_rects()
@@ -184,11 +187,8 @@ func _on_touch_down(index: int, pos: Vector2) -> bool:
 		return true
 	if _finger == -1 and _in_stick_zone(pos):
 		_finger = index
-		# El conjunto entero se muda adonde cae el pulgar y ahí se queda al soltar.
-		_anchor = _clamp_anchor(pos)
-		_anchor_set = true
+		# El stick no se muda: se maneja con el toque relativo al centro fijo.
 		_center = _anchor
-		_layout()
 		_update_stick(pos)
 		return true
 	return false
@@ -280,10 +280,10 @@ func _rest_center() -> Vector2:
 	var rect: Rect2 = get_global_rect()
 	var s: float = settings.controls_scale
 	var r: float = _stick_radius()
-	var x: float = rect.end.x - r - 150.0 * s
+	var x: float = rect.end.x - r - REST_SIDE_GAP * s
 	if settings.left_handed:
-		x = rect.position.x + r + 150.0 * s
-	return Vector2(x, rect.end.y - r - 70.0 * s)
+		x = rect.position.x + r + REST_SIDE_GAP * s
+	return Vector2(x, rect.end.y - r - REST_BOTTOM_GAP * s)
 
 
 func _draw() -> void:

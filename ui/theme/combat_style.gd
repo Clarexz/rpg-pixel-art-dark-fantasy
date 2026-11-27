@@ -15,6 +15,8 @@ const SPELL: Color = Color(0.42, 0.35, 0.8)
 const ITEMS: Color = Color(0.59, 0.43, 0.24)
 const FLEE: Color = Color(0.27, 0.27, 0.31)
 const NEUTRAL: Color = Color(0.27, 0.27, 0.31)
+## Bloquear en el arco.
+const BLOCK: Color = Color8(70, 110, 200)
 const GUARD: Color = Color(0.27, 0.38, 0.59)
 const PANEL: Color = Color(0.08, 0.055, 0.1, 0.92)
 const OUTLINE: Color = Color(0.04, 0.024, 0.047)

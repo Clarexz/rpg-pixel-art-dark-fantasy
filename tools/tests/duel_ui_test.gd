@@ -71,16 +71,90 @@ func _run() -> void:
 			_events.clear()
 			await _tap(far)
 			_check(_events.is_empty(), "%s: un toque lejos del arco en %s emitió %s" % [tag, far, _events])
-	# Al pedir la cuadrícula el arco desaparece y vuelven las celdas.
-	ui.show_grid(DuelUI.Rows.BOTH, false, false)
+	await _check_grid_arc(ui, host)
+	# Con neutral (canciones) vuelve la cuadrícula de botones y el arco se oculta.
+	ui.left_handed = false
+	ui.apply_hand()
+	ui.show_grid(DuelUI.Rows.BOTH, false, false, true)
 	await _wait(0.1)
-	_check(not ui.arc_menu().visible, "el arco sigue visible tras show_grid")
+	_check(not ui.arc_menu().visible, "el arco sigue visible tras show_grid neutral")
 	_check(ui.button_for(&"cell", 0) != null, "no volvió la cuadrícula")
 	# Y las celdas son rectas (sin inclinación).
 	var cell_box: StyleBoxFlat = ui.button_for(&"cell", 0).get_theme_stylebox("normal") as StyleBoxFlat
 	_check(cell_box.skew == Vector2.ZERO, "las celdas no deberían estar inclinadas")
 	await _check_hud(ui, host)
 	await _check_rival(ui, host)
+
+
+## Atacar/Bloquear en el arco: 6 sectores + centro (Volver) + franja (Terminar).
+func _check_grid_arc(ui: DuelUI, host: Control) -> void:
+	for left: bool in [false, true]:
+		ui.left_handed = left
+		ui.apply_hand()
+		var tag: String = "zurdo" if left else "diestro"
+		ui.show_grid(DuelUI.Rows.BOTH, true, true)
+		await _wait(0.6)
+		var arc: ArcMenu = ui.arc_menu()
+		_check(arc.visible, "%s: el arco no se ve en show_grid" % tag)
+		_check(arc.entry_count() == 8, "%s: el arco de la cuadrícula tiene %d entradas" % [tag, arc.entry_count()])
+		_check(not ui.player_hud().compact, "%s: el HUD debería estar completo con show_grid" % tag)
+		_check(ui.player_hud().strip, "%s: la base debería extenderse con la franja" % tag)
+		for key: String in ["back:0", "end:0", "cell:0", "cell:3"]:
+			var b: Button = ui.button_for(StringName(key.get_slice(":", 0)), int(key.get_slice(":", 1)))
+			_check(b == null or not b.is_visible_in_tree(), "%s: el botón viejo %s se ve" % [tag, key])
+		var pivot: Vector2 = arc.get_global_transform() * arc.pivot()
+		var kinds: Array = [[&"cell", 0], [&"cell", 1], [&"cell", 2], [&"cell", 3], [&"cell", 4], [&"cell", 5], [&"back", 0], [&"end", 0]]
+		for ev: Array in kinds:
+			var pt: Vector2 = ui.point_for(ev[0], ev[1])
+			_check(Rect2(Vector2.ZERO, host.size).has_point(pt), "%s: %s cae fuera de la pantalla %s" % [tag, ev, pt])
+			_events.clear()
+			await _tap(pt)
+			_check(_events == [ev], "%s: tocar %s emitió %s" % [tag, ev, _events])
+		# izq queda a la izquierda de der en pantalla (bloquear y atacar).
+		for base: int in [0, 3]:
+			var xl: float = ui.point_for(&"cell", base).x
+			var xc: float = ui.point_for(&"cell", base + 1).x
+			var xr: float = ui.point_for(&"cell", base + 2).x
+			_check(xl < xc and xc < xr, "%s: orden izq/centro/der en pantalla (%s, %s, %s)" % [tag, xl, xc, xr])
+		# Atacar (anillo interior) más cerca del pivote que Bloquear.
+		_check(ui.point_for(&"cell", 4).distance_to(pivot) < ui.point_for(&"cell", 1).distance_to(pivot), "%s: atacar no está en el anillo interior" % tag)
+		# Fila apagada: tocar los ataques no emite; bloquear sí. Sin volver a desplegar.
+		ui.set_rows(DuelUI.Rows.TOP)
+		await _wait(0.05)
+		for cell: int in [3, 4, 5]:
+			_events.clear()
+			await _tap(ui.point_for(&"cell", cell))
+			_check(_events.is_empty(), "%s: el ataque %d apagado emitió %s" % [tag, cell, _events])
+		_events.clear()
+		await _tap(ui.point_for(&"cell", 1))
+		_check(_events == [[&"cell", 1]], "%s: bloquear con TOP emitió %s" % [tag, _events])
+		ui.set_rows(DuelUI.Rows.BOTTOM)
+		_events.clear()
+		await _tap(ui.point_for(&"cell", 4))
+		_check(_events == [[&"cell", 4]], "%s: atacar con BOTTOM emitió %s" % [tag, _events])
+		# mark no rompe nada.
+		ui.mark(&"cell", 4)
+		ui.mark(&"end", 0)
+		# Sin back/end: no hay centro ni franja y el HUD no extiende la base.
+		ui.show_grid(DuelUI.Rows.BOTH, false, false)
+		await _wait(0.4)
+		_check(arc.entry_count() == 6, "%s: sin back/end debería haber 6 entradas (%d)" % [tag, arc.entry_count()])
+		_check(not ui.player_hud().strip, "%s: la base no debería extenderse sin franja" % tag)
+		_events.clear()
+		await _tap(pivot + Vector2(-60.0 if not left else 60.0, -60.0))
+		_check(_events.is_empty(), "%s: el centro sin Volver emitió %s" % [tag, _events])
+		ui.show_grid(DuelUI.Rows.BOTH, true, false)
+		await _wait(0.4)
+		_check(arc.entry_count() == 7, "%s: solo back debería dar 7 entradas (%d)" % [tag, arc.entry_count()])
+		ui.set_back_visible(false)
+		_check(arc.entry_count() == 6, "%s: set_back_visible(false) no quitó el centro" % tag)
+		# Volver al menú restaura el arco normal y el HUD sin franja.
+		ui.show_menu("fácil")
+		await _wait(0.3)
+		_check(arc.entry_count() == 4 and not ui.player_hud().strip, "%s: show_menu no restauró el arco" % tag)
+		_events.clear()
+		await _tap(ui.point_for(&"menu", 1))
+		_check(_events == [[&"menu", 1]], "%s: point_for(menu) emitió %s" % [tag, _events])
 
 
 ## El HUD del jugador: completo (pivote del arco) con el menú, y compacto
@@ -98,11 +172,12 @@ func _check_hud(ui: DuelUI, host: Control) -> void:
 		ui.apply_hand()
 		var tag: String = "zurdo" if left else "diestro"
 		var hud: PlayerHud = ui.player_hud()
-		for state: String in ["menu", "grid", "grid_util", "spells", "items"]:
+		for state: String in ["menu", "grid", "grid_util", "neutral", "spells", "items"]:
 			match state:
 				"menu": ui.show_menu("fácil")
 				"grid": ui.show_grid(DuelUI.Rows.BOTH, false, false)
 				"grid_util": ui.show_grid(DuelUI.Rows.BOTH, true, true)
+				"neutral": ui.show_grid(DuelUI.Rows.BOTH, true, true, true)
 				"spells": ui.show_spells(spells, 20)
 				"items": ui.show_items(items)
 			await _wait(0.4)
@@ -112,10 +187,11 @@ func _check_hud(ui: DuelUI, host: Control) -> void:
 			var arc: ArcMenu = ui.arc_menu()
 			var arc_pivot: Vector2 = arc.get_global_transform() * arc.pivot()
 			var hp: Vector2 = hud.get_global_transform() * hud.pivot()
-			if state == "menu":
+			if state in ["menu", "grid", "grid_util"]:
 				_check(not hud.compact, "%s: el HUD debería estar en modo completo" % where)
 				_check(hp.is_equal_approx(arc_pivot), "%s: el pivote del HUD %s no coincide con el del arco %s" % [where, hp, arc_pivot])
-				_check(is_equal_approx(hud.dial_radius(), 462.0), "%s: radio del HUD completo %s" % [where, hud.dial_radius()])
+				var want_r: float = 506.0 if state == "grid_util" else 462.0
+				_check(is_equal_approx(hud.dial_radius(), want_r), "%s: radio del HUD completo %s" % [where, hud.dial_radius()])
 				continue
 			_check(hud.compact, "%s: el HUD debería estar en modo compacto" % where)
 			# Esquina contraria a la mano, pegada abajo.
@@ -242,11 +318,13 @@ func _check_prompt(ui: DuelUI, host: Control) -> void:
 	for left: bool in [false, true]:
 		ui.left_handed = left
 		ui.apply_hand()
-		for state: String in ["menu", "grid_util", "grid_bare"]:
+		for state: String in ["menu", "grid_arc", "grid_arc_bare", "grid_util", "grid_bare"]:
 			match state:
 				"menu": ui.show_menu("fácil")
-				"grid_util": ui.show_grid(DuelUI.Rows.BOTH, true, true)
-				"grid_bare": ui.show_grid(DuelUI.Rows.BOTH, false, false)
+				"grid_arc": ui.show_grid(DuelUI.Rows.BOTH, true, true)
+				"grid_arc_bare": ui.show_grid(DuelUI.Rows.BOTH, false, false)
+				"grid_util": ui.show_grid(DuelUI.Rows.BOTH, true, true, true)
+				"grid_bare": ui.show_grid(DuelUI.Rows.BOTH, false, false, true)
 			await _wait(0.3)
 			var where: String = "%s/%s" % ["zurdo" if left else "diestro", state]
 			var pl: Label = ui.prompt_label()
@@ -268,14 +346,15 @@ func _check_prompt(ui: DuelUI, host: Control) -> void:
 					_check(not pr.intersects(cb.get_global_rect()), "%s: el aviso cruza %s" % [where, key])
 			var hand_side: bool = pr.get_center().x > host.size.x * 0.5
 			_check(hand_side != left, "%s: el aviso no está del lado de la mano %s" % [where, pr])
-			if state == "menu":
+			if state in ["menu", "grid_arc", "grid_arc_bare"]:
 				var hud: PlayerHud = ui.player_hud()
 				var hp: Vector2 = hud.get_global_transform() * hud.pivot()
-				var top: float = hp.y - 462.0
+				var reach: float = 506.0 if state == "grid_arc" else 462.0
+				var top: float = hp.y - reach
 				_check(absf(pr.end.y - (top - 12.0)) < 1.0, "%s: el aviso debería terminar 12 px sobre la base (%s vs %s)" % [where, pr.end.y, top - 12.0])
 				# Su caja no toca el arco de la base en ningún punto.
 				var far: Vector2 = Vector2(pr.position.x if not left else pr.end.x, pr.end.y)
-				_check(far.distance_to(hp) > 462.0, "%s: el aviso toca la base %s" % [where, far])
+				_check(far.distance_to(hp) > reach, "%s: el aviso toca la base %s" % [where, far])
 			else:
 				var row_top: float = ui._util_row.global_position.y if state == "grid_util" else ui._cluster.global_position.y
 				_check(pr.end.y <= row_top - 11.0, "%s: el aviso no está sobre los botones (%s vs %s)" % [where, pr.end.y, row_top])
@@ -291,7 +370,7 @@ func _check_hp_number(ui: DuelUI, host: Control) -> void:
 		ui.apply_hand()
 		for compact: bool in [false, true]:
 			if compact:
-				ui.show_grid(DuelUI.Rows.BOTH, false, false)
+				ui.show_grid(DuelUI.Rows.BOTH, false, false, true)
 			else:
 				ui.show_menu("fácil")
 			await _wait(0.3)
@@ -301,10 +380,16 @@ func _check_hp_number(ui: DuelUI, host: Control) -> void:
 			_check(Rect2(Vector2.ZERO, host.size).encloses(r), "%s: el número de PV se sale de la pantalla %s" % [where, r])
 			if not compact:
 				var hp: Vector2 = hud.get_global_transform() * hud.pivot()
-				# Los 4 vértices quedan dentro del radio interior de la barra (184).
+				# Los 4 vértices quedan entre el botón central (118) y la barra (184).
 				for c: Vector2 in [r.position, Vector2(r.end.x, r.position.y), Vector2(r.position.x, r.end.y), r.end]:
 					_check(c.distance_to(hp) < 184.0, "%s: el número de PV toca la barra %s" % [where, r])
+					_check(c.distance_to(hp) > 118.0, "%s: el número de PV toca el botón central %s" % [where, r])
 				_check(r.end.y <= hp.y + 12.0, "%s: el número de PV baja del margen %s" % [where, r])
+				# En el mismo lugar con el arco de atacar/bloquear.
+				ui.show_grid(DuelUI.Rows.BOTH, true, true)
+				await _wait(0.2)
+				var r2: Rect2 = hud.get_global_transform() * hud.number_rect()
+				_check(r2.is_equal_approx(r), "%s: el número de PV saltó entre menú y cuadrícula" % where)
 
 
 ## Toca un punto global (como el pulgar): ScreenTouch abajo y arriba.

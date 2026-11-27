@@ -39,6 +39,12 @@ const ARC: Array[Dictionary] = [
 	{"text": "ITEMS", "color": CombatStyle.ITEMS, "ring": 1, "a0": 182.0, "a1": 223.0},
 	{"text": "HUIR", "color": CombatStyle.FLEE, "ring": 1, "a0": 227.0, "a1": 268.0},
 ]
+## Cuadrícula en arco (atacar/bloquear): rangos de cada dirección, de la
+## orilla (abajo) hacia arriba en diestro: izq, centro, der.
+const GRID_SPANS: Array[Vector2] = [Vector2(182.0, 208.0), Vector2(210.0, 238.0), Vector2(240.0, 268.0)]
+const GRID_DIRS: Array[StringName] = [&"izq", &"centro", &"der"]
+const BACK_SPAN: Vector2 = Vector2(180.0, 270.0)
+const END_SPAN: Vector2 = Vector2(182.0, 268.0)
 ## Margen en la orilla de la mano de los botones de la cuadrícula.
 const HAND_MARGIN: float = 16.0
 const CLUSTER_W: float = 480.0
@@ -75,6 +81,12 @@ var _flash: ColorRect
 var _banner: Label
 var _buttons: Dictionary = {}  # "kind:value" -> Button
 var _lock_until: int = 0
+## Cuadrícula en arco: qué evento emite cada entrada de _arc ([kind, value]).
+var _grid_arc: bool = false
+var _arc_map: Array[Array] = []
+var _g_rows: Rows = Rows.NONE
+var _g_back: bool = false
+var _g_end: bool = false
 
 
 func _ready() -> void:
@@ -166,7 +178,7 @@ func prompt_label() -> Label:
 ## flee_hint = qué tan fácil es huir según tu piedra ("fácil", "difícil"...).
 func show_menu(flee_hint: String = "") -> void:
 	_set_util(false, false)
-	_fill(3, [])
+	_fill(3, [], false)
 	var entries: Array[Dictionary] = []
 	for i: int in ARC.size():
 		var e: Dictionary = ARC[i].duplicate()
@@ -177,7 +189,6 @@ func show_menu(flee_hint: String = "") -> void:
 	_arc.left_handed = left_handed
 	_arc.set_entries(entries, true)
 	_arc.show()
-	_hud.compact = false
 	_layout_prompt()
 
 
@@ -191,24 +202,73 @@ func arc_menu() -> ArcMenu:
 	return _arc
 
 
-## La cuadrícula 2x3. neutral = colores iguales (para tocar canciones).
+## La cuadrícula de 6 celdas. Atacar/Bloquear van en el arco (neutral = false);
+## con neutral = true (canciones) sigue la cuadrícula 2x3 de botones.
 func show_grid(rows: Rows, back: bool, end: bool, neutral: bool = false) -> void:
+	if not neutral:
+		_show_grid_arc(rows, back, end)
+		return
 	_set_util(back, end)
 	var defs: Array[Dictionary] = []
 	for cell: int in 6:
-		var color: Color = COLOR_NEUTRAL if neutral else (COLOR_GUARD if cell < 3 else COLOR_ATTACK)
-		defs.append(_def(CELL_TEXT[cell], &"cell", cell, color))
+		defs.append(_def(CELL_TEXT[cell], &"cell", cell, COLOR_NEUTRAL))
 	_fill(3, defs)
 	set_rows(rows)
 
 
 func set_rows(rows: Rows) -> void:
+	_g_rows = rows
 	for cell: int in 6:
-		var top: bool = cell < 3
-		var on: bool = rows == Rows.BOTH or (rows == Rows.TOP and top) or (rows == Rows.BOTTOM and not top)
+		var on: bool = _row_on(rows, cell)
 		var b: Button = _buttons.get("cell:%d" % cell)
 		if b:
 			b.disabled = not on
+		if _grid_arc:
+			var idx: int = _arc_map.find([&"cell", cell])
+			if idx >= 0:
+				_arc.set_entry_disabled(idx, not on)
+
+
+func _row_on(rows: Rows, cell: int) -> bool:
+	var top: bool = cell < 3
+	return rows == Rows.BOTH or (rows == Rows.TOP and top) or (rows == Rows.BOTTOM and not top)
+
+
+func _show_grid_arc(rows: Rows, back: bool, end: bool) -> void:
+	_set_util(false, false)
+	_fill(3, [], false)
+	_grid_arc = true
+	_g_rows = rows
+	_g_back = back
+	_g_end = end
+	_hud.strip = end
+	_arc.left_handed = left_handed
+	_build_grid_arc(true)
+	_arc.show()
+	_layout_prompt()
+
+
+func _build_grid_arc(animate: bool) -> void:
+	var entries: Array[Dictionary] = []
+	_arc_map.clear()
+	# En zurdo el arco se espeja: se invierte el orden para que "izq" siga a la izquierda.
+	for ring: int in 2:
+		for d: int in 3:
+			var span: Vector2 = GRID_SPANS[2 - d if left_handed else d]
+			var cell: int = d + (3 if ring == 0 else 0)
+			entries.append({"text": "", "color": CombatStyle.MELEE if ring == 0 else CombatStyle.BLOCK,
+					"ring": ring, "a0": span.x, "a1": span.y, "disabled": not _row_on(_g_rows, cell),
+					"icon": &"sword" if ring == 0 else &"shield", "arrow": GRID_DIRS[d]})
+			_arc_map.append([&"cell", cell])
+	if _g_back:
+		entries.append({"text": "", "color": CombatStyle.FLEE, "ring": 2, "a0": BACK_SPAN.x,
+				"a1": BACK_SPAN.y, "disabled": false, "icon": &"back"})
+		_arc_map.append([&"back", 0])
+	if _g_end:
+		entries.append({"text": "TERMINAR TURNO", "color": CombatStyle.NEUTRAL, "ring": 3,
+				"a0": END_SPAN.x, "a1": END_SPAN.y, "disabled": false, "font_max": 18})
+		_arc_map.append([&"end", 0])
+	_arc.set_entries(entries, animate)
 
 
 ## spells: [{name, cost, ...}]. Los que no alcanzan de PM se ven apagados.
@@ -236,6 +296,11 @@ func show_items(items: Array) -> void:
 
 
 func set_back_visible(on: bool) -> void:
+	if _grid_arc:
+		if on != _g_back:
+			_g_back = on
+			_build_grid_arc(false)
+		return
 	_back_button.visible = on
 
 
@@ -272,6 +337,11 @@ func clear_telegraph() -> void:
 
 ## Ilumina un botón un instante (para que se note qué tocaste).
 func mark(kind: StringName, value: int, color: Color = Color.WHITE) -> void:
+	if _grid_arc and _arc.visible:
+		var idx: int = _arc_map.find([kind, value])
+		if idx >= 0:
+			_arc.mark_entry(idx, color)
+			return
 	var b: Button = _buttons.get("%s:%d" % [kind, value])
 	if b == null:
 		return
@@ -312,6 +382,21 @@ func banner(text: String) -> void:
 ## Para las pruebas: el botón de cierto evento (o null).
 func button_for(kind: StringName, value: int) -> Button:
 	return _buttons.get("%s:%d" % [kind, value])
+
+
+## Para las pruebas: punto global donde tocar para emitir ese evento: el
+## sector del arco (menú o cuadrícula en arco) o el centro del botón.
+func point_for(kind: StringName, value: int) -> Vector2:
+	if _arc.visible:
+		if kind == &"menu" and not _grid_arc:
+			return _arc.point_for(value)
+		var idx: int = _arc_map.find([kind, value]) if _grid_arc else -1
+		if idx >= 0:
+			return _arc.point_for(idx)
+	var b: Button = button_for(kind, value)
+	if b == null:
+		return Vector2(-1000.0, -1000.0)
+	return b.get_global_rect().get_center()
 
 
 # --- Construcción -------------------------------------------------------------
@@ -451,7 +536,7 @@ func _layout_prompt() -> void:
 		x0 = cx - w * 0.5
 	else:
 		var k: float = ArcMenu.scale_for(size.x)
-		bottom = size.y - PlayerHud.BOTTOM_MARGIN - 462.0 * k - PROMPT_GAP
+		bottom = size.y - PlayerHud.BOTTOM_MARGIN - (PlayerHud.STRIP_R if _hud.strip else 462.0) * k - PROMPT_GAP
 		x0 = size.x - PROMPT_EDGE - w if not left_handed else PROMPT_EDGE
 	x1 = x0 + w
 	_prompt.position = Vector2(x0, bottom - h)
@@ -487,12 +572,15 @@ func _def(text: String, kind: StringName, value: int, color: Color) -> Dictionar
 	return {"text": text, "kind": kind, "value": value, "color": color, "disabled": false}
 
 
-func _fill(columns: int, defs: Array[Dictionary]) -> void:
+func _fill(columns: int, defs: Array[Dictionary], compact: bool = true) -> void:
 	for child: Node in _cluster.get_children():
 		child.queue_free()
 	_buttons.clear()
 	_arc.hide()
-	_hud.compact = true
+	_grid_arc = false
+	_arc_map.clear()
+	_hud.strip = false
+	_hud.compact = compact
 	_layout_prompt()
 	_buttons["back:0"] = _back_button
 	_buttons["end:0"] = _end_button
@@ -509,6 +597,10 @@ func _fill(columns: int, defs: Array[Dictionary]) -> void:
 
 
 func _on_arc_pressed(index: int) -> void:
+	if _grid_arc:
+		if index < _arc_map.size():
+			_emit(_arc_map[index][0] as StringName, _arc_map[index][1] as int)
+		return
 	_emit(&"menu", index)
 
 

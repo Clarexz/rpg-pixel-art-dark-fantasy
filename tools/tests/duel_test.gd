@@ -48,7 +48,8 @@ func _ready() -> void:
 
 func _run() -> void:
 	var rect: Rect2 = _one.get_global_rect()
-	var thumb: Vector2 = Vector2(rect.get_center().x, rect.end.y - 200)
+	# El stick es fijo: se toca en su centro de reposo.
+	var thumb: Vector2 = _one._anchor
 
 	# 1) Stick de tanque: arriba avanza, a la derecha gira (sin caminar de lado).
 	print("Paso 1: Stick de tanque: arriba avanza, a la derecha gira (sin caminar de lado).")
@@ -112,11 +113,11 @@ func _run() -> void:
 	var pa_before: int = _duel.pa
 	var rival_before: int = _rival.hp
 	for side: int in [3, 5]:
-		await _tap(_ui.button_for(&"cell", side))
+		await _tap(_ui.point_for(&"cell", side))
 		await _until(func() -> bool: return _duel.phase == &"melee", 3.0)
 	_check(_duel.pa == pa_before - 2 * Duel.ATTACK_COST, "los golpes no gastaron PA (%d -> %d)" % [pa_before, _duel.pa])
 	_check(_rival.hp < rival_before, "los golpes no le bajaron vida al lobo")
-	await _tap(_ui.button_for(&"end", 0))
+	await _tap(_ui.point_for(&"end", 0))
 
 	# 5) Turno del rival: bloquear justo antes del impacto = perfecto.
 	print("Paso 5: Turno del rival: bloquear justo antes del impacto = perfecto.")
@@ -134,7 +135,7 @@ func _run() -> void:
 	for note: int in Duel.SPELLS[0].song:
 		await _until(func() -> bool: return _duel.phase == &"song", 2.0)
 		await _seconds(0.15)
-		await _tap(_ui.button_for(&"cell", note))
+		await _tap(_ui.point_for(&"cell", note))
 	await _seconds(0.5)
 	_check(_duel.pm == pm_before - int(Duel.SPELLS[0].cost), "el hechizo no gastó PM")
 	_check(rival_before - _rival.hp >= int(Duel.SPELLS[0].power), "el hechizo no hizo su daño (%d)" % (rival_before - _rival.hp))
@@ -187,7 +188,7 @@ func _block_rival_turn(perfect: bool) -> void:
 			var wait: float = _duel.impact_at - 0.1 - Time.get_ticks_usec() / 1_000_000.0
 			if wait > 0.0:
 				await _seconds(wait)
-			await _tap(_ui.button_for(&"cell", side), 0.0)
+			await _tap(_ui.point_for(&"cell", side), 0.0)
 			await _until(func() -> bool: return _duel.phase != &"block", 2.0)
 		await _frames(1)
 

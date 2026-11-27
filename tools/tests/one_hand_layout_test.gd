@@ -1,7 +1,7 @@
 extends Node
-## Prueba del conjunto de exploración a una mano: el stick flotante y los
-## botones ATACAR / PIEDRA se mueven juntos, se quedan donde soltaste el
-## pulgar, no se salen de la pantalla y se reflejan en modo zurdo.
+## Prueba del conjunto de exploración a una mano: el stick y los botones
+## ATACAR / PIEDRA quedan fijos en la posición de reposo (no siguen al toque),
+## no se salen de la pantalla y se reflejan en modo zurdo.
 ## Corre en CI con: godot --headless --path . res://tools/tests/one_hand_layout_test.tscn
 
 const WORLD: PackedScene = preload("res://world/world.tscn")
@@ -49,16 +49,23 @@ func _run() -> void:
 		_check(button.texture != null and button.texture.get_width() > 0, "%s sin textura" % button.label)
 		_check(button.texture_pressed != null and button.texture_pressed.get_width() > 0, "%s sin textura apretada" % button.label)
 
-	# 1) Toque del stick en P y soltar: el conjunto se muda a P y se queda.
-	print("Paso 1: el conjunto sigue al pulgar y se queda al soltar.")
-	var p: Vector2 = Vector2(rect.get_center().x + 60.0, rect.end.y - 250.0)
+	# 1) El reposo está en la posición nueva y tocar la zona NO mueve el ancla.
+	print("Paso 1: el conjunto queda fijo en el reposo aunque toques en otro punto.")
+	_check_rest(rect, r, false, "diestro")
+	var rest: Vector2 = _one._anchor
+	var p: Vector2 = Vector2(rect.get_center().x - 120.0, rect.end.y - 250.0)
 	_touch(0, p, true)
 	await _frames(2)
-	_check_cluster(p, r, "con el dedo puesto")
+	_check_cluster(rest, r, "con el dedo puesto")
+	_check(_one._center.distance_to(rest) <= 1.0, "el centro del stick se movió del reposo")
+	var expected: Vector2 = (p - rest).limit_length(r)
+	_check(_one._knob.distance_to(rest + expected) <= 1.0, "el knob no se desplazó hacia el toque (%s)" % _one._knob)
+	_check((_one._knob - rest).normalized().dot((p - rest).normalized()) > 0.99, "el knob no apunta hacia el toque")
 	_touch(0, p, false)
 	await _frames(5)
-	_check_cluster(p, r, "después de soltar")
+	_check_cluster(rest, r, "después de soltar")
 	_check(_stone.hit_center().y < _attack.hit_center().y, "la piedra no está arriba del ataque")
+	p = rest
 
 	# 2) Tocar ATACAR no mueve el conjunto.
 	print("Paso 2: tocar ATACAR no mueve el conjunto.")
@@ -69,8 +76,8 @@ func _run() -> void:
 	await _frames(2)
 	_check_cluster(p, r, "tras tocar ATACAR")
 
-	# 3) Cerca del borde izquierdo: todo cabe en el control.
-	print("Paso 3: junto al borde izquierdo todo cabe en pantalla.")
+	# 3) Tocar junto a los bordes tampoco mueve nada y todo cabe en el control.
+	print("Paso 3: junto a los bordes el conjunto sigue fijo y cabe en pantalla.")
 	var edge: Vector2 = Vector2(rect.position.x + 5.0, rect.end.y - 100.0)
 	_touch(0, edge, true)
 	await _frames(2)
@@ -84,16 +91,14 @@ func _run() -> void:
 	_check_inside(rect, r, "esquina inferior derecha")
 	_touch(0, edge_r, false)
 	await _frames(2)
+	_check_cluster(rest, r, "tras tocar los bordes")
 
 	# 4) Zurdo: los botones pasan a la derecha del stick.
 	print("Paso 4: en modo zurdo el ataque queda a la derecha del stick.")
 	_one.settings.left_handed = true
 	_world.apply_mode()
 	await _frames(3)
-	_touch(0, p, true)
-	await _frames(2)
-	_touch(0, p, false)
-	await _frames(2)
+	_check_rest(rect, r, true, "zurdo")
 	var anchor: Vector2 = _one._anchor
 	_check(absf(_attack.hit_center().x - (anchor.x + r + OneHandControls.ATTACK_GAP * _one.settings.controls_scale)) <= 1.0, "zurdo: ataque no está a R+GAP a la derecha (x=%.1f, ancla=%.1f)" % [_attack.hit_center().x, anchor.x])
 	_check(absf(_stone.hit_center().x - _attack.hit_center().x) <= 1.0, "zurdo: la piedra no está sobre el ataque")
@@ -130,11 +135,36 @@ func _run() -> void:
 	_world.apply_mode()
 	await _frames(3)
 
+	# 6) Pantalla alta (720x1560, como el celular del diseñador): reposo nuevo.
+	print("Paso 6: el reposo es correcto en 720x1560, diestro y zurdo.")
+	get_window().size = Vector2i(405, 877)
+	await _frames(5)
+	rect = _one.get_global_rect()
+	r = _one._stick_radius()
+	_check(rect.size.y > 1500.0, "la pantalla alta no se aplicó (alto %.0f)" % rect.size.y)
+	_check_rest(rect, r, false, "alta, diestro")
+	_one.settings.left_handed = true
+	_world.apply_mode()
+	await _frames(3)
+	_check_rest(rect, r, true, "alta, zurdo")
+	_one.settings.left_handed = false
+	_world.apply_mode()
+	await _frames(3)
+
+
+## Reposo: (borde del lado de la mano -/+ r + 204·s, borde inferior - r - 267·s).
+func _check_rest(rect: Rect2, r: float, left: bool, when: String) -> void:
+	var s: float = _one.settings.controls_scale
+	var x: float = rect.position.x + r + 204.0 * s if left else rect.end.x - r - 204.0 * s
+	var want: Vector2 = Vector2(x, rect.end.y - r - 267.0 * s)
+	_check(_one._anchor.distance_to(want) <= 1.0, "%s: reposo %s != %s" % [when, _one._anchor, want])
+	_check(_one._rest_center().distance_to(want) <= 1.0, "%s: _rest_center %s != %s" % [when, _one._rest_center(), want])
+
 
 ## Comprueba que el ataque esté a R+ATTACK_GAP a la izquierda del stick y ATTACK_LIFT px arriba.
 func _check_cluster(p: Vector2, r: float, when: String) -> void:
 	var anchor: Vector2 = _one._anchor
-	_check(anchor.distance_to(p) <= 1.0, "%s: el ancla no está en el toque (%s vs %s)" % [when, anchor, p])
+	_check(anchor.distance_to(p) <= 1.0, "%s: el ancla no está en el reposo (%s vs %s)" % [when, anchor, p])
 	var a: Vector2 = _attack.hit_center()
 	_check(absf(a.x - (anchor.x - r - OneHandControls.ATTACK_GAP * _one.settings.controls_scale)) <= 1.0, "%s: ataque no está a R+GAP a la izquierda (x=%.1f)" % [when, a.x])
 	_check(absf(a.y - (anchor.y - OneHandControls.ATTACK_LIFT * _one.settings.controls_scale)) <= 1.0, "%s: ataque no está ATTACK_LIFT arriba del centro (y=%.1f)" % [when, a.y])
