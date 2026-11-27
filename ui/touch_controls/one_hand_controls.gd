@@ -295,7 +295,7 @@ func _draw() -> void:
 	var center: Vector2 = (_center if active else _anchor) - global_position
 	var knob: Vector2 = (_knob if active else _anchor) - global_position
 	var alpha: float = 0.75 if active else 0.6
-	var tex_tint: Color = Color(1, 1, 1, 1.0 if active else 0.8)
+	var tex_tint: Color = Color(1, 1, 1, 1.0 if active else 0.9)
 	draw_texture_rect(STICK_BASE_TEX, Rect2(center - Vector2(r, r), Vector2(r, r) * 2.0), false, tex_tint)
 	if _sprinting:
 		draw_arc(center, r + 8.0 * s, 0.0, TAU, 64, Color(1, 0.8, 0.2, 0.8), 4.0 * s, true)
