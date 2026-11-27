@@ -145,7 +145,7 @@ func test_common_enemy_duel() -> void:
 	_check(_duel.hp < Duel.PLAYER_MAX_HP, "su primer golpe no hizo daño")
 	# Bomba: daño fijo, gasta el item.
 	var hp_before: int = scav.hp
-	await _tap(_ui.button_for(&"menu", 2))
+	await _tap(_ui.menu_point(2))
 	await _until(func() -> bool: return _duel.phase == &"items", 2.0)
 	await _tap(_ui.button_for(&"item", 2))
 	await _until(func() -> bool: return _duel.phase != &"items" and _duel.phase != &"busy", 3.0)
@@ -230,7 +230,7 @@ func _total(inv: Inventory) -> int:
 
 
 func _end_turn_with_one_hit() -> void:
-	await _tap(_ui.button_for(&"menu", 0))
+	await _tap(_ui.menu_point(0))
 	await _until(func() -> bool: return _duel.phase == &"melee", 2.0)
 	await _tap(_ui.button_for(&"cell", 4))
 	await _until(func() -> bool: return _duel.phase == &"melee", 3.0)
@@ -238,7 +238,7 @@ func _end_turn_with_one_hit() -> void:
 
 
 func _cast(index: int) -> void:
-	await _tap(_ui.button_for(&"menu", 1))
+	await _tap(_ui.menu_point(1))
 	await _until(func() -> bool: return _duel.phase == &"spell_pick", 2.0)
 	await _tap(_ui.button_for(&"spell", index))
 	for note: int in Duel.SPELLS[index].song:
@@ -251,19 +251,19 @@ func _cast(index: int) -> void:
 func _finish_win(enemy: Enemy) -> void:
 	await _until(func() -> bool: return _duel.phase == &"menu", 8.0)
 	enemy.hp = 1
-	await _tap(_ui.button_for(&"menu", 0))
+	await _tap(_ui.menu_point(0))
 	await _until(func() -> bool: return _duel.phase == &"melee", 2.0)
 	await _tap(_ui.button_for(&"cell", 3))
 	await _until(func() -> bool: return not _duel.is_active(), 10.0)
 
 
-func _tap(button: Button, delay: float = 0.2) -> void:
-	if button == null:
+func _tap(target: Variant, delay: float = 0.2) -> void:
+	if target == null:
 		_failures.append("no se encontró un botón del duelo")
 		return
 	if delay > 0.0:
 		await _seconds(delay)
-	var c: Vector2 = get_viewport().get_screen_transform() * button.get_global_rect().get_center()
+	var c: Vector2 = get_viewport().get_screen_transform() * _point_of(target)
 	for pressed: bool in [true, false]:
 		var e: InputEventScreenTouch = InputEventScreenTouch.new()
 		e.position = c
@@ -290,3 +290,10 @@ func _until(condition: Callable, timeout: float) -> void:
 	var end: float = Time.get_ticks_msec() + timeout * 1000.0
 	while not condition.call() and Time.get_ticks_msec() < end:
 		await get_tree().process_frame
+
+
+## Punto global a tocar: un Vector2 tal cual, o el centro de un botón.
+func _point_of(target: Variant) -> Vector2:
+	if target is Vector2:
+		return target
+	return (target as Control).get_global_rect().get_center()

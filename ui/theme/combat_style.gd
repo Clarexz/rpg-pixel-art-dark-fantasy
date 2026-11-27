@@ -1,12 +1,11 @@
 class_name CombatStyle
 extends RefCounted
-## Estilo visual del combate: paralelogramos inclinados, bordes oscuros y
-## tipografía de título. Solo helpers estáticos, sin nodos, para reutilizarlos
-## en las pantallas de combate.
+## Estilo visual del combate: colores sólidos, esquinas rectas, borde oscuro de
+## 4 px, sombra y tipografía de título. Solo helpers estáticos, sin nodos, para
+## reutilizarlos en las pantallas de combate.
 
-## Inclinación única de todas las formas (valor absoluto de StyleBoxFlat.skew.x).
-## Para la mano derecha la parte de arriba se va hacia el centro (skew negativo,
-## el borde queda "\" y la pila sube en diagonal hacia adentro). En zurdo se espeja.
+## Inclinación reservada para el aviso de ataque del enemigo (texto). Los
+## botones y cajas son rectos: `skew` vale 0 salvo que alguien pida otra cosa.
 const SKEW: float = 0.3
 
 const ATTACK: Color = Color(0.77, 0.16, 0.17)
@@ -30,13 +29,8 @@ static func title_font() -> Font:
 	return _title_font
 
 
-## Inclinación según la mano: zurdo = espejo.
-static func skew_for(left_handed: bool) -> float:
-	return SKEW if left_handed else -SKEW
-
-
-## Caja sin esquinas redondeadas, borde de 4 px, inclinada y con sombra suave.
-static func skewed_box(color: Color, skew: float = SKEW) -> StyleBoxFlat:
+## Caja sin esquinas redondeadas, borde de 4 px y sombra suave (recta por defecto).
+static func skewed_box(color: Color, skew: float = 0.0) -> StyleBoxFlat:
 	var s: StyleBoxFlat = StyleBoxFlat.new()
 	s.bg_color = color
 	s.set_corner_radius_all(0)
@@ -50,8 +44,8 @@ static func skewed_box(color: Color, skew: float = SKEW) -> StyleBoxFlat:
 	return s
 
 
-## Aplica el estilo inclinado a un botón: normal / hover / pressed / disabled.
-static func style_button(b: Button, color: Color, font_size: int, title: bool, skew: float = SKEW) -> void:
+## Aplica el estilo de combate a un botón: normal / hover / pressed / disabled.
+static func style_button(b: Button, color: Color, font_size: int, title: bool, skew: float = 0.0) -> void:
 	b.add_theme_stylebox_override("normal", skewed_box(color, skew))
 	b.add_theme_stylebox_override("hover", skewed_box(color, skew))
 	b.add_theme_stylebox_override("pressed", skewed_box(color.lightened(0.35), skew))
