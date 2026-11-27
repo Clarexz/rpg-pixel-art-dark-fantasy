@@ -47,10 +47,18 @@ const GAP: float = 10.0
 ## Después de cambiar los botones, ignorar toques un instante: si no, el
 ## mismo pulgar que tocó "Hechizos" "toca" el botón nuevo que aparece debajo.
 const SWAP_LOCK_MS: int = 150
+## Habla del rival: `Nombre: "texto"`. Cualquier otra línea es narración.
+const _SPEECH_RE: String = "^[^:\\n]+:\\s*[\"“«](.*)[\"”»]$"
+const PROMPT_W: float = 440.0
+const PROMPT_GAP: float = 12.0
+const PROMPT_SIZE: int = 22
+const PROMPT_EDGE: float = 8.0
 
 var left_handed: bool = false
 
 var _rival_name: String = ""
+var _root: VBoxContainer
+var _SPEECH: RegEx = _make_speech_re()
 var _dial: RivalDial
 var _bubble: SpeechBubble
 var _prompt: Label
@@ -99,32 +107,36 @@ func status(text: String) -> void:
 	_dial.status_text = text
 
 
-## Separa lo que dice el rival (globo) de la lectura de la piedra (líneas con
-## "◆", que van al dial). Al globo no se le pone "Nombre: " ni las comillas.
+## Separa tres cosas: la lectura de la piedra (líneas con "◆", al dial), el
+## habla (una línea con la forma `Nombre: "texto"`, al globo, sin prefijo ni
+## comillas) y la narración (todo lo demás: texto suelto en cursiva, sin globo,
+## en el mismo lugar). Solo uno de los dos a la vez: manda el habla.
 func say(text: String) -> void:
-	var spoken: PackedStringArray = PackedStringArray()
+	var other: PackedStringArray = PackedStringArray()
 	var reading: PackedStringArray = PackedStringArray()
 	for line: String in text.split("\n"):
 		var l: String = line.strip_edges()
 		if l.begins_with("◆"):
 			reading.append(l)
 		elif not l.is_empty():
-			spoken.append(l)
-	var msg: String = "\n".join(spoken)
-	var prefix: String = _rival_name + ": "
-	if not _rival_name.is_empty() and msg.begins_with(prefix):
-		msg = msg.substr(prefix.length()).strip_edges()
-		for pair: String in ["\"\"", "“”", "«»"]:
-			if msg.length() >= 2 and msg.begins_with(pair[0]) and msg.ends_with(pair[1]):
-				msg = msg.substr(1, msg.length() - 2).strip_edges()
-				break
+			other.append(l)
+	var msg: String = "\n".join(other)
+	var spoken: String = ""
+	var narration: String = msg
+	var m: RegExMatch = _SPEECH.search(msg)
+	if m:
+		spoken = m.get_string(1).strip_edges()
+		narration = ""
 	_dial.reading_text = "\n".join(reading)
 	_bubble.top_y = _dial.bubble_top()
-	_bubble.say(msg)
+	_bubble.say(spoken)
+	_bubble.narrate(narration)
 
 
+## El aviso va como una línea discreta justo encima del arco del jugador.
 func prompt(text: String) -> void:
 	_prompt.text = text
+	_layout_prompt()
 
 
 ## Para las pruebas: el dial del rival y el texto del globo.
@@ -134,6 +146,19 @@ func rival_dial() -> RivalDial:
 
 func speech_text() -> String:
 	return _bubble.text()
+
+
+func narration_text() -> String:
+	return _bubble.narration()
+
+
+## Para las pruebas: el globo/narración y el aviso.
+func bubble() -> SpeechBubble:
+	return _bubble
+
+
+func prompt_label() -> Label:
+	return _prompt
 
 
 ## Menú principal del turno: 4 sectores en arco alrededor de la base del pulgar
@@ -153,6 +178,7 @@ func show_menu(flee_hint: String = "") -> void:
 	_arc.set_entries(entries, true)
 	_arc.show()
 	_hud.compact = false
+	_layout_prompt()
 
 
 ## Para las pruebas: punto global (centro) del sector `index` del menú en arco.
@@ -297,6 +323,8 @@ func _build() -> void:
 	add_child(_telegraph)
 
 	var root: VBoxContainer = VBoxContainer.new()
+	_root = root
+	root.sort_children.connect(_layout_prompt)
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_theme_constant_override("separation", 10)
@@ -307,7 +335,9 @@ func _build() -> void:
 	_prompt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_prompt.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_prompt.add_theme_font_size_override("font_size", 24)
+	_prompt.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	_prompt.max_lines_visible = 2
+	_prompt.add_theme_font_size_override("font_size", PROMPT_SIZE)
 	_prompt.add_theme_color_override("font_outline_color", CombatStyle.OUTLINE)
 	_prompt.add_theme_constant_override("outline_size", 8)
 
@@ -388,19 +418,44 @@ func apply_hand() -> void:
 	_pack(_cluster_row, cluster_items)
 
 
-## El aviso va arriba, del lado de la mano y a la derecha del dial (zurdo:
-## espejado), alineado con el borde de arriba del dial. El globo va bajo el dial.
-## DuelUI ya vive dentro de la zona segura (SafeArea en duel.tscn), así que el
-## margen superior es solo RivalDial.TOP_MARGIN.
+## El globo/narración va bajo el dial del rival. DuelUI ya vive dentro de la
+## zona segura (SafeArea en duel.tscn), así que el margen superior es solo
+## RivalDial.TOP_MARGIN.
 func _layout_top() -> void:
 	if _dial == null:
 		return
-	var edge: float = _dial.dial_radius() + 14.0
-	var x0: float = 16.0 if left_handed else edge
-	var x1: float = size.x - edge if left_handed else size.x - 16.0
-	_prompt.position = Vector2(x0, RivalDial.TOP_MARGIN)
-	_prompt.size = Vector2(maxf(x1 - x0, 0.0), 0.0)
 	_bubble.top_y = _dial.bubble_top()
+	_layout_prompt()
+
+
+## El aviso: una línea discreta (máx. 2 renglones, 440 px) centrada del lado de
+## la mano. Modo completo: su borde de abajo queda 12 px sobre el punto más alto
+## de la base de piedra del jugador. Modo compacto: justo encima de la fila de
+## arriba de botones (Volver/Terminar) o, si no hay, de la cuadrícula.
+func _layout_prompt() -> void:
+	if _prompt == null or _hud == null:
+		return
+	var font: Font = _prompt.get_theme_default_font()
+	var h: float = ceilf(font.get_height(PROMPT_SIZE)) * 2.0 + 8.0
+	var w: float = minf(PROMPT_W, size.x - PROMPT_EDGE * 2.0)
+	var bottom: float
+	var x0: float
+	var x1: float
+	if _hud.compact:
+		var row: Control = _util_row if (_back_button.visible or _end_button.visible) else _cluster
+		var r: Rect2 = Rect2(row.global_position - global_position, row.size)
+		if row == _cluster and _cluster.get_child_count() == 0:
+			r = Rect2(_cluster_row.global_position - global_position, Vector2(CLUSTER_W, 0.0))
+		bottom = r.position.y - PROMPT_GAP
+		var cx: float = size.x - HAND_MARGIN - CLUSTER_W * 0.5 if not left_handed else HAND_MARGIN + CLUSTER_W * 0.5
+		x0 = cx - w * 0.5
+	else:
+		var k: float = ArcMenu.scale_for(size.x)
+		bottom = size.y - PlayerHud.BOTTOM_MARGIN - 462.0 * k - PROMPT_GAP
+		x0 = size.x - PROMPT_EDGE - w if not left_handed else PROMPT_EDGE
+	x1 = x0 + w
+	_prompt.position = Vector2(x0, bottom - h)
+	_prompt.size = Vector2(x1 - x0, h)
 
 
 func _pack(row: HBoxContainer, items: Array[Control]) -> void:
@@ -422,6 +477,12 @@ func _pack(row: HBoxContainer, items: Array[Control]) -> void:
 		row.add_child(margin)
 
 
+func _make_speech_re() -> RegEx:
+	var re: RegEx = RegEx.new()
+	re.compile("(?s)" + _SPEECH_RE)
+	return re
+
+
 func _def(text: String, kind: StringName, value: int, color: Color) -> Dictionary:
 	return {"text": text, "kind": kind, "value": value, "color": color, "disabled": false}
 
@@ -432,6 +493,7 @@ func _fill(columns: int, defs: Array[Dictionary]) -> void:
 	_buttons.clear()
 	_arc.hide()
 	_hud.compact = true
+	_layout_prompt()
 	_buttons["back:0"] = _back_button
 	_buttons["end:0"] = _end_button
 	_cluster.columns = columns
@@ -459,6 +521,7 @@ func _emit(kind: StringName, value: int) -> void:
 func _set_util(back: bool, end: bool) -> void:
 	_back_button.visible = back
 	_end_button.visible = end
+	_layout_prompt()
 
 
 func _make_button(text: String, color: Color, min_size: Vector2) -> Button:

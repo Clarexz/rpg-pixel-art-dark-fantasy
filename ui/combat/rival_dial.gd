@@ -29,6 +29,10 @@ const STEP_DEG: float = 3.0
 const HP_FLASH_TIME: float = 0.35
 ## Espacio entre la base y el globo de diálogo (para DuelUI).
 const BUBBLE_GAP: float = 72.0
+## Lectura de la piedra: tamaño, separación de la base y margen a la orilla.
+const READING_SIZE: int = 20
+const READING_GAP: float = 12.0
+const READING_MARGIN: float = 16.0
 
 const COLOR_HP: Color = Color8(196, 40, 44)
 const COLOR_STONE: Color = Color8(22, 17, 28, 230)
@@ -233,12 +237,12 @@ func _draw() -> void:
 	var stone: PackedVector2Array = _sector(0.0, BASE_R * k, 0.0, 90.0)
 	draw_colored_polygon(stone, COLOR_STONE)
 	_outline(stone, CombatStyle.OUTLINE, 3.0)
-	# Vida: del lado de la orilla de arriba hacia la pared.
+	# Vida: anclada al extremo de abajo (pegado a la pared); lo vacío crece desde arriba.
 	var back: PackedVector2Array = _sector(HP_R0 * k, HP_R1 * k, HP_A0, HP_A1)
 	draw_colored_polygon(back, COLOR_HP.darkened(0.72))
 	var frac: float = clampf(float(_hp) / float(_max_hp), 0.0, 1.0)
 	if frac > 0.0:
-		var fill: PackedVector2Array = _sector(HP_R0 * k, HP_R1 * k, HP_A0, HP_A0 + (HP_A1 - HP_A0) * frac)
+		var fill: PackedVector2Array = _sector(HP_R0 * k, HP_R1 * k, HP_A1 - (HP_A1 - HP_A0) * frac, HP_A1)
 		draw_colored_polygon(fill, COLOR_HP.lerp(Color.WHITE, _hp_flash))
 		_outline(fill, CombatStyle.OUTLINE, 3.0)
 	_outline(back, CombatStyle.OUTLINE, 3.0)
@@ -302,7 +306,7 @@ func _draw_arc_text(text: String, r: float) -> void:
 	draw_set_transform_matrix(Transform2D.IDENTITY)
 
 
-## Estado y lectura de la piedra, bajo la base y alineados a su orilla.
+## Estado bajo la base (alineado a su orilla) y lectura de la piedra a su lado.
 func _draw_notes(k: float) -> void:
 	var font: Font = get_theme_default_font()
 	var w: float = minf(size.x * 0.45, 320.0)
@@ -312,7 +316,31 @@ func _draw_notes(k: float) -> void:
 	if not status_text.is_empty():
 		draw_string_outline(font, Vector2(x, y), status_text, align, w, 24, 6, CombatStyle.OUTLINE)
 		draw_string(font, Vector2(x, y), status_text, align, w, 24, COLOR_STATUS)
-		y += 28.0
-	if not reading_text.is_empty():
-		draw_multiline_string_outline(font, Vector2(x, y - 2.0), reading_text, align, w, 20, 2, 5, CombatStyle.OUTLINE)
-		draw_multiline_string(font, Vector2(x, y - 2.0), reading_text, align, w, 20, 2, gem_color)
+	var r: Rect2 = reading_rect()
+	if r.size != Vector2.ZERO:
+		var pos: Vector2 = Vector2(r.position.x, r.position.y + font.get_ascent(READING_SIZE))
+		draw_multiline_string_outline(font, pos, reading_text, align, r.size.x, READING_SIZE, -1, 5, CombatStyle.OUTLINE)
+		draw_multiline_string(font, pos, reading_text, align, r.size.x, READING_SIZE, -1, gem_color)
+
+
+## Y (local) del eje del dial: la altura de la gema.
+func axis_y() -> float:
+	return _pt(GEM_R * _scale(), MID_A).y
+
+
+## Rectángulo (local) de la lectura de la piedra: a la derecha de la base (zurdo:
+## a la izquierda), con su centro vertical en el eje del dial. Vacío si no hay lectura.
+func reading_rect() -> Rect2:
+	if reading_text.is_empty():
+		return Rect2()
+	var font: Font = get_theme_default_font()
+	var gap: float = BASE_R * _scale() + READING_GAP
+	var avail: float = size.x - gap - READING_MARGIN
+	if avail < 40.0:
+		return Rect2()
+	var natural: Vector2 = font.get_multiline_string_size(reading_text, HORIZONTAL_ALIGNMENT_LEFT, -1, READING_SIZE)
+	var ts: Vector2 = natural
+	if natural.x > avail:
+		ts = font.get_multiline_string_size(reading_text, HORIZONTAL_ALIGNMENT_LEFT, avail, READING_SIZE)
+	var x: float = pivot().x + gap if not left_handed else pivot().x - gap - avail
+	return Rect2(Vector2(x, axis_y() - ts.y * 0.5), Vector2(avail, ts.y))

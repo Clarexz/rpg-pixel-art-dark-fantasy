@@ -4,6 +4,8 @@ extends Control
 ## sesgadas, texto oscuro y una colita hacia abajo (hacia el rival, en el
 ## centro). Centrado en pantalla; `top_y` es donde empieza la caja. A pantalla
 ## completa y sin recibir toques. Vacío = oculto.
+## También muestra la narración (texto suelto en cursiva, sin globo) en el mismo
+## lugar; DuelUI manda solo una de las dos a la vez.
 
 const PAPER: Color = Color8(240, 232, 214)
 const INK: Color = Color8(30, 20, 30)
@@ -14,6 +16,11 @@ const SKEW: float = 10.0
 const TAIL_H: float = 20.0
 const POP_FROM: float = 0.9
 const POP_TIME: float = 0.12
+const NARR_SIZE: int = 24
+const NARR_MAX_W: float = 560.0
+const NARR_COLOR: Color = Color8(230, 220, 200)
+const NARR_OUTLINE: int = 6
+const NARR_SLANT: float = 0.2
 
 var top_y: float = 300.0:
 	set(value):
@@ -21,6 +28,8 @@ var top_y: float = 300.0:
 		queue_redraw()
 
 var _text: String = ""
+var _narr: String = ""
+var _narr_font: FontVariation
 var _pop: float = 1.0:
 	set(value):
 		_pop = value
@@ -42,10 +51,25 @@ func text() -> String:
 	return _text
 
 
+func narration() -> String:
+	return _narr
+
+
 func say(value: String) -> void:
 	var changed: bool = value != _text
 	_text = value
-	visible = not value.is_empty()
+	_refresh(changed)
+
+
+## Narración: sin globo, texto suelto y en cursiva.
+func narrate(value: String) -> void:
+	var changed: bool = value != _narr
+	_narr = value
+	_refresh(changed)
+
+
+func _refresh(changed: bool) -> void:
+	visible = not _text.is_empty() or not _narr.is_empty()
 	queue_redraw()
 	if changed and visible and is_inside_tree():
 		if _tween:
@@ -72,8 +96,39 @@ func box_rect() -> Rect2:
 	return Rect2(Vector2(size.x * 0.5 - box.x * 0.5, top_y), box)
 
 
+func _italic() -> Font:
+	if _narr_font == null:
+		_narr_font = FontVariation.new()
+		_narr_font.base_font = get_theme_default_font()
+		_narr_font.variation_transform = Transform2D(Vector2(1.0, 0.0), Vector2(NARR_SLANT, 1.0), Vector2.ZERO)
+	return _narr_font
+
+
+## Para las pruebas: rectángulo (local) del texto de la narración.
+func narration_rect() -> Rect2:
+	if _narr.is_empty():
+		return Rect2()
+	var font: Font = _italic()
+	var ts: Vector2 = font.get_multiline_string_size(_narr, HORIZONTAL_ALIGNMENT_CENTER, NARR_MAX_W, NARR_SIZE)
+	var w: float = minf(ts.x, NARR_MAX_W)
+	return Rect2(Vector2(size.x * 0.5 - w * 0.5, top_y), Vector2(w, ts.y))
+
+
+func _draw_narration() -> void:
+	var font: Font = _italic()
+	var r: Rect2 = narration_rect()
+	var c: Vector2 = r.get_center()
+	draw_set_transform_matrix(Transform2D(0.0, Vector2(_pop, _pop), 0.0, c * (1.0 - _pop)))
+	var at: Vector2 = Vector2(r.position.x, r.position.y + font.get_ascent(NARR_SIZE))
+	draw_multiline_string_outline(font, at, _narr, HORIZONTAL_ALIGNMENT_CENTER, r.size.x, NARR_SIZE, -1, NARR_OUTLINE, CombatStyle.OUTLINE)
+	draw_multiline_string(font, at, _narr, HORIZONTAL_ALIGNMENT_CENTER, r.size.x, NARR_SIZE, -1, NARR_COLOR)
+	draw_set_transform_matrix(Transform2D.IDENTITY)
+
+
 func _draw() -> void:
 	if _text.is_empty():
+		if not _narr.is_empty():
+			_draw_narration()
 		return
 	var font: Font = get_theme_default_font()
 	var r: Rect2 = box_rect()

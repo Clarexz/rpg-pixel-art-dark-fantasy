@@ -275,22 +275,36 @@ func _outline(pts: PackedVector2Array, color: Color, w: float) -> void:
 	draw_polyline(o, color, w, true)
 
 
-## Número de PV girado a lo largo del arco (tangente), nunca de cabeza.
-func _draw_number(g: Dictionary, k: float) -> void:
+## Rectángulo (local) del número de PV, recto (sin girar). Completo: junto al
+## extremo de abajo de la barra, por dentro de la curva y con la base sobre el
+## margen inferior. Compacto: centrado en el cuarto de disco.
+func number_rect() -> Rect2:
+	var g: Dictionary = _geo()
+	var k: float = _scale()
+	var fs: int = g.num_size
+	var font: Font = CombatStyle.title_font()
+	var w: float = font.get_string_size(str(_hp), HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	var h: float = font.get_height(fs)
+	if compact:
+		var c: Vector2 = _pt(float(g.num_r) * k, g.num_a)
+		return Rect2(c - Vector2(w, h) * 0.5, Vector2(w, h))
+	# Por dentro de la barra (radio interior de PV), a 10 px de ella.
+	var hp: Vector2 = g.hp
+	var reach: float = hp.x * k - 10.0
+	var x: float = pivot().x + reach - w if _mirrored() else pivot().x - reach
+	var y: float = pivot().y - 2.0 - font.get_ascent(fs)
+	return Rect2(Vector2(x, y), Vector2(w, h))
+
+
+## Número de PV, horizontal (nunca girado).
+func _draw_number(g: Dictionary, _k: float) -> void:
 	var font: Font = CombatStyle.title_font()
 	var fs: int = g.num_size
-	var center: Vector2 = _pt(float(g.num_r) * k, g.num_a)
-	var radial: Vector2 = (center - pivot()).normalized()
-	var tangent: Vector2 = Vector2(-radial.y, radial.x)
-	if tangent.x < 0.0:
-		tangent = -tangent
+	var r: Rect2 = number_rect()
+	var at: Vector2 = Vector2(r.position.x, r.position.y + font.get_ascent(fs))
 	var text: String = str(_hp)
-	var w: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-	draw_set_transform_matrix(Transform2D(tangent.angle(), center))
-	var at: Vector2 = Vector2(-w * 0.5, fs * 0.35)
 	draw_string_outline(font, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 6, CombatStyle.OUTLINE)
 	draw_string(font, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
-	draw_set_transform_matrix(Transform2D.IDENTITY)
 
 
 func _segments(kind: StringName, color: Color, g: Dictionary, k: float) -> void:

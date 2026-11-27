@@ -194,33 +194,117 @@ func _check_rival(ui: DuelUI, host: Control) -> void:
 	ui.set_rival(absurd.strip_edges().substr(0, 60), 12, 40)
 	_check(d.name_lines().size() <= 2 and d.name_lines()[d.name_lines().size() - 1].ends_with("…"), "nombre absurdo debería recortarse: %s" % d.name_lines())
 	ui.set_rival("Lobo de ceniza", 12, 40)
-	# Globo: quita el nombre y las comillas; la lectura va al dial.
-	ui.say("Lobo de ceniza: \"Hola\"\n◆ Piedra: fuerte.")
+	# Habla `Nombre: "texto"`: globo sin prefijo ni comillas; la lectura va al dial.
+	ui.say("Lobo: \"Hola\"\n◆ Piedra: fuerte.")
 	_check(ui.speech_text() == "Hola", "el globo dice '%s'" % ui.speech_text())
+	_check(ui.narration_text() == "", "no debería haber narración: '%s'" % ui.narration_text())
 	_check(d.reading_text == "◆ Piedra: fuerte.", "la lectura del dial: '%s'" % d.reading_text)
 	_check(ui._bubble.visible, "el globo debería verse")
 	var box: Rect2 = ui._bubble.box_rect()
 	_check(absf(box.get_center().x - host.size.x * 0.5) < 1.0, "el globo no está centrado %s" % box)
 	_check(box.position.y >= d.dial_radius(), "el globo tapa el dial %s" % box)
+	# La lectura va a la derecha de la base, centrada en el eje del dial.
+	var rr: Rect2 = d.reading_rect()
+	_check(rr.position.x >= 236.0 + 12.0 - 0.5 and rr.end.x <= host.size.x - 16.0 + 0.5, "lectura fuera de su zona %s" % rr)
+	_check(absf(rr.get_center().y - d.axis_y()) < 1.0, "la lectura no está en el eje del dial %s vs %s" % [rr, d.axis_y()])
+	# Narración: sin globo, mismo lugar.
+	ui.say("El carroñero chilla.\n◆ Piedra: débil.")
+	_check(ui.speech_text() == "", "la narración no debería ir al globo: '%s'" % ui.speech_text())
+	_check(ui.narration_text() == "El carroñero chilla.", "narración: '%s'" % ui.narration_text())
+	_check(d.reading_text == "◆ Piedra: débil.", "la lectura de la narración: '%s'" % d.reading_text)
+	_check(ui._bubble.visible and ui._bubble.box_rect() == Rect2(), "narración sin caja de globo")
+	var nr: Rect2 = ui._bubble.narration_rect()
+	_check(absf(nr.get_center().x - host.size.x * 0.5) < 1.0 and nr.position.y >= d.dial_radius(), "la narración está mal puesta %s" % nr)
+	ui.say("El gólem cruje: se prepara.")
+	_check(ui.narration_text() == "El gólem cruje: se prepara." and ui.speech_text() == "", "una línea con ':' sin comillas es narración")
 	ui.say("◆ Piedra: sola.")
-	_check(ui.speech_text() == "" and not ui._bubble.visible, "una lectura sola no debería dejar globo")
+	_check(ui.speech_text() == "" and ui.narration_text() == "" and not ui._bubble.visible, "una lectura sola no debería dejar globo ni narración")
 	ui.say("Eco sin prefijo")
-	_check(ui.speech_text() == "Eco sin prefijo", "sin prefijo: '%s'" % ui.speech_text())
+	_check(ui.speech_text() == "" and ui.narration_text() == "Eco sin prefijo", "sin forma de habla es narración")
 	ui.say("")
-	_check(not ui._bubble.visible and ui.speech_text() == "", "say('') debería ocultar el globo")
+	_check(not ui._bubble.visible and ui.speech_text() == "" and ui.narration_text() == "", "say('') debería ocultar todo")
 	ui.status("Cargando…")
 	_check(d.status_text == "Cargando…", "el estado no llegó al dial")
 	ui.status("")
-	# El aviso queda a la derecha del dial (diestro) y a la izquierda (zurdo).
-	ui.prompt("Elige qué hacer")
+	await _check_prompt(ui, host)
+	await _check_hp_number(ui, host)
+	# Vida: lo vacío crece desde arriba (el relleno queda anclado abajo).
+	ui.left_handed = false
+	ui.apply_hand()
+
+
+## El aviso: encima del arco en el menú; encima de la fila de botones (o de la
+## cuadrícula) en modo compacto. No cruza botones, globo ni la base del jugador.
+func _check_prompt(ui: DuelUI, host: Control) -> void:
+	ui.set_rival("Lobo", 30, 40)
+	ui.say("Lobo: \"La última vez cubriste a la izquierda, ¿te acuerdas?\"")
+	ui.prompt("Tu turno. Elige qué hacer con tu piedra y tu espada.")
 	for left: bool in [false, true]:
 		ui.left_handed = left
 		ui.apply_hand()
-		var pr: Rect2 = ui._prompt.get_global_rect()
-		var dial_rect: Rect2 = Rect2(0.0 if not left else host.size.x - d.dial_radius(), 0.0, d.dial_radius(), d.dial_radius() + 8.0)
-		_check(not pr.intersects(dial_rect), "%s: el aviso choca con el dial %s" % ["zurdo" if left else "diestro", pr])
-	ui.left_handed = false
-	ui.apply_hand()
+		for state: String in ["menu", "grid_util", "grid_bare"]:
+			match state:
+				"menu": ui.show_menu("fácil")
+				"grid_util": ui.show_grid(DuelUI.Rows.BOTH, true, true)
+				"grid_bare": ui.show_grid(DuelUI.Rows.BOTH, false, false)
+			await _wait(0.3)
+			var where: String = "%s/%s" % ["zurdo" if left else "diestro", state]
+			var pl: Label = ui.prompt_label()
+			var pr: Rect2 = pl.get_global_rect()
+			_check(Rect2(Vector2.ZERO, host.size).encloses(pr), "%s: el aviso se sale de la pantalla %s" % [where, pr])
+			_check(pr.size.x <= 440.0 + 0.5, "%s: el aviso es muy ancho %s" % [where, pr])
+			_check(pl.get_theme_font_size("font_size") == 22, "%s: tamaño del aviso" % where)
+			_check(pl.get_line_count() <= 2 or pl.max_lines_visible == 2, "%s: más de 2 renglones" % where)
+			var bubble: SpeechBubble = ui.bubble()
+			var bb: Rect2 = bubble.box_rect()
+			bb = bb.grow_individual(0.0, 0.0, 0.0, SpeechBubble.TAIL_H)
+			_check(not pr.intersects(bb), "%s: el aviso cruza el globo %s vs %s" % [where, pr, bb])
+			for b: Button in [ui._back_button, ui._end_button]:
+				if b.is_visible_in_tree():
+					_check(not pr.intersects(b.get_global_rect()), "%s: el aviso cruza un botón %s" % [where, b.get_global_rect()])
+			for key: String in ["cell:0", "cell:1", "cell:2", "cell:3", "cell:4", "cell:5"]:
+				var cb: Button = ui.button_for(StringName(key.get_slice(":", 0)), int(key.get_slice(":", 1)))
+				if cb != null and cb.is_visible_in_tree():
+					_check(not pr.intersects(cb.get_global_rect()), "%s: el aviso cruza %s" % [where, key])
+			var hand_side: bool = pr.get_center().x > host.size.x * 0.5
+			_check(hand_side != left, "%s: el aviso no está del lado de la mano %s" % [where, pr])
+			if state == "menu":
+				var hud: PlayerHud = ui.player_hud()
+				var hp: Vector2 = hud.get_global_transform() * hud.pivot()
+				var top: float = hp.y - 462.0
+				_check(absf(pr.end.y - (top - 12.0)) < 1.0, "%s: el aviso debería terminar 12 px sobre la base (%s vs %s)" % [where, pr.end.y, top - 12.0])
+				# Su caja no toca el arco de la base en ningún punto.
+				var far: Vector2 = Vector2(pr.position.x if not left else pr.end.x, pr.end.y)
+				_check(far.distance_to(hp) > 462.0, "%s: el aviso toca la base %s" % [where, far])
+			else:
+				var row_top: float = ui._util_row.global_position.y if state == "grid_util" else ui._cluster.global_position.y
+				_check(pr.end.y <= row_top - 11.0, "%s: el aviso no está sobre los botones (%s vs %s)" % [where, pr.end.y, row_top])
+				_check(pr.end.y >= row_top - 14.0, "%s: el aviso está lejos de los botones (%s vs %s)" % [where, pr.end.y, row_top])
+	ui.say("")
+
+
+## Número de PV del jugador: recto, dentro de pantalla, sin tocar la barra.
+func _check_hp_number(ui: DuelUI, host: Control) -> void:
+	ui.set_stats(100, 100, 3, 9, 5, 12)
+	for left: bool in [false, true]:
+		ui.left_handed = left
+		ui.apply_hand()
+		for compact: bool in [false, true]:
+			if compact:
+				ui.show_grid(DuelUI.Rows.BOTH, false, false)
+			else:
+				ui.show_menu("fácil")
+			await _wait(0.3)
+			var hud: PlayerHud = ui.player_hud()
+			var r: Rect2 = hud.get_global_transform() * hud.number_rect()
+			var where: String = "%s/%s" % ["zurdo" if left else "diestro", "compacto" if compact else "completo"]
+			_check(Rect2(Vector2.ZERO, host.size).encloses(r), "%s: el número de PV se sale de la pantalla %s" % [where, r])
+			if not compact:
+				var hp: Vector2 = hud.get_global_transform() * hud.pivot()
+				# Los 4 vértices quedan dentro del radio interior de la barra (184).
+				for c: Vector2 in [r.position, Vector2(r.end.x, r.position.y), Vector2(r.position.x, r.end.y), r.end]:
+					_check(c.distance_to(hp) < 184.0, "%s: el número de PV toca la barra %s" % [where, r])
+				_check(r.end.y <= hp.y + 12.0, "%s: el número de PV baja del margen %s" % [where, r])
 
 
 ## Toca un punto global (como el pulgar): ScreenTouch abajo y arriba.
