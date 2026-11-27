@@ -51,6 +51,7 @@ var _blockers: Array[Control] = []
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	for child: Node in find_children("*", "ActionButton", true, false):
 		_buttons.append(child as ActionButton)
 	resized.connect(_layout)
@@ -64,9 +65,9 @@ func add_blocker(control: Control) -> void:
 ## Separación del botón de ataque respecto al borde del stick (mano derecha).
 const BASE_STICK_RADIUS: float = 95.0
 const ATTACK_GAP: float = 62.0
-## Paleta A (elegida por Caleb): stick café claro y perilla más clara.
-const STICK_COLOR: Color = Color(0.78, 0.64, 0.48)
-const KNOB_COLOR: Color = Color(0.9, 0.8, 0.66)
+## Texturas pixel art del stick (estilo "Materiales").
+const STICK_BASE_TEX: Texture2D = preload("res://assets/ui/controls/stick_base.png")
+const STICK_KNOB_TEX: Texture2D = preload("res://assets/ui/controls/stick_knob.png")
 const ATTACK_LIFT: float = 0.0  # centrado con el stick (pedido de Caleb)
 ## Espacio plano entre el cuadrado de ataque y la media luna de la piedra.
 const STONE_GAP: float = 14.0
@@ -294,14 +295,15 @@ func _draw() -> void:
 	var center: Vector2 = (_center if active else _anchor) - global_position
 	var knob: Vector2 = (_knob if active else _anchor) - global_position
 	var alpha: float = 0.75 if active else 0.6
-	draw_circle(center, r, STICK_COLOR * Color(1, 1, 1, alpha))
-	draw_arc(center, r, 0.0, TAU, 64, STICK_COLOR.darkened(0.55), 4.0, true)
+	var tex_tint: Color = Color(1, 1, 1, 1.0 if active else 0.8)
+	draw_texture_rect(STICK_BASE_TEX, Rect2(center - Vector2(r, r), Vector2(r, r) * 2.0), false, tex_tint)
 	if _sprinting:
 		draw_arc(center, r + 8.0 * s, 0.0, TAU, 64, Color(1, 0.8, 0.2, 0.8), 4.0 * s, true)
 	# Las flechas llevan una sombra oscura para leerse sobre el café claro.
 	_draw_hints(center + Vector2(1.5, 1.5), r, Color(0.2, 0.12, 0.05, alpha + 0.3))
 	_draw_hints(center, r, Color(1, 1, 1, alpha + 0.4))
-	draw_circle(knob, r * 0.42, KNOB_COLOR)
+	var knob_half: float = r * 0.84 * 0.5
+	draw_texture_rect(STICK_KNOB_TEX, Rect2(knob - Vector2(knob_half, knob_half), Vector2(knob_half, knob_half) * 2.0), false)
 
 
 func _draw_hints(center: Vector2, r: float, hint: Color) -> void:

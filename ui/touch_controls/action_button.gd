@@ -35,6 +35,17 @@ enum Shape { CIRCLE, SQUARE, HALF_MOON }
 		_update_min_size()
 		queue_redraw()
 @export var color: Color = Color(0.85, 0.3, 0.3)
+## Textura pixel art opcional. Si está puesta, reemplaza el relleno y el
+## borde dibujados por código (la etiqueta se dibuja encima igual).
+@export var texture: Texture2D:
+	set(value):
+		texture = value
+		queue_redraw()
+## Textura al estar apretado; si falta, se usa "texture" más oscura.
+@export var texture_pressed: Texture2D:
+	set(value):
+		texture_pressed = value
+		queue_redraw()
 ## Si es true, arrastrar el dedo sobre este botón también gira la cámara
 ## (como el botón de disparo de los shooters móviles).
 @export var drag_looks: bool = false
@@ -52,6 +63,7 @@ var pressed: bool = false
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_update_min_size()
 
 
@@ -111,14 +123,36 @@ func _shape_points(scale_factor: float) -> PackedVector2Array:
 	return points
 
 
+## Dibuja la textura estirada a la caja; apretado = un poco más chica,
+## con el mismo pivote que el contorno por código.
+func _draw_texture() -> void:
+	var box: Vector2 = get_box_size()
+	var factor: float = 0.92 if pressed else 1.0
+	var size_px: Vector2 = box * factor
+	# Pivote: centro, salvo la media luna que se ancla al lado plano (abajo).
+	var pivot: Vector2 = Vector2(box.x * 0.5, box.y) if shape == Shape.HALF_MOON else box * 0.5
+	var top_left: Vector2 = pivot - (pivot * factor)
+	var tex: Texture2D = texture
+	var tint: Color = Color.WHITE
+	if pressed:
+		if texture_pressed != null:
+			tex = texture_pressed
+		else:
+			tint = Color(0.8, 0.8, 0.8, 1.0)
+	draw_texture_rect(tex, Rect2(top_left, size_px), false, tint)
+
+
 func _draw() -> void:
-	var fill: Color = color
-	fill.a = 1.0 if pressed else 0.85
-	var points: PackedVector2Array = _shape_points(0.92 if pressed else 1.0)
-	draw_colored_polygon(points, fill)
-	var outline: PackedVector2Array = points.duplicate()
-	outline.append(points[0])
-	draw_polyline(outline, fill.darkened(0.55), 4.0, true)  # borde oscuro del mismo tono (estilo pixel art)
+	if texture != null:
+		_draw_texture()
+	else:
+		var fill: Color = color
+		fill.a = 1.0 if pressed else 0.85
+		var points: PackedVector2Array = _shape_points(0.92 if pressed else 1.0)
+		draw_colored_polygon(points, fill)
+		var outline: PackedVector2Array = points.duplicate()
+		outline.append(points[0])
+		draw_polyline(outline, fill.darkened(0.55), 4.0, true)  # borde oscuro del mismo tono (estilo pixel art)
 	var box: Vector2 = get_box_size()
 	var font: Font = get_theme_default_font()
 	var font_size: int = int(radius * visual_scale * 0.45)

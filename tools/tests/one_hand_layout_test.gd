@@ -43,6 +43,12 @@ func _run() -> void:
 	var rect: Rect2 = _one.get_global_rect()
 	var r: float = _one._stick_radius()
 
+	# 0) Los botones llevan sus texturas pixel art.
+	print("Paso 0: ATACAR y PIEDRA tienen textura asignada.")
+	for button: ActionButton in [_attack, _stone]:
+		_check(button.texture != null and button.texture.get_width() > 0, "%s sin textura" % button.label)
+		_check(button.texture_pressed != null and button.texture_pressed.get_width() > 0, "%s sin textura apretada" % button.label)
+
 	# 1) Toque del stick en P y soltar: el conjunto se muda a P y se queda.
 	print("Paso 1: el conjunto sigue al pulgar y se queda al soltar.")
 	var p: Vector2 = Vector2(rect.get_center().x + 60.0, rect.end.y - 250.0)
